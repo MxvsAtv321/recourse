@@ -5,12 +5,31 @@ import type { Delivery, DeliveredRecord, SignedBlobTimestamp } from "./types.js"
 
 export const SOURCE_ID = keccak256(toHex("COINBASE_ETH_USD_FEED"));
 
+/** How far before `now` a record was produced. Constant, or per index. */
+export type AgeOffset = bigint | ((index: number) => bigint);
+
+/**
+ * A partially refreshed feed: the collector ran current for the first stretch,
+ * then the upstream source went stale and only a fraction of records refreshed
+ * after that.
+ *
+ * Scattered rather than blocked on purpose. A contiguous stale tail is the one
+ * shape a naive spot check stumbles into by accident, and a delivery that is
+ * stale from index 0 makes the counterexample look planted. Interleaving means
+ * the head of the file is clean and the breach is real but not where a sampler
+ * would look.
+ */
+export function partiallyStale(freshBy: bigint, staleBy: bigint, onset: number): AgeOffset {
+  return (index: number): bigint => (index >= onset && (index * 7 + 3) % 5 !== 0 ? staleBy : freshBy);
+}
+
 /**
  * Build a delivery of correctly shaped records. `generatedAtOffset` is how far
  * before `now` each record was actually produced upstream. The seller controls
  * when the FILE is assembled; it does not control when the records were made.
  */
-export function buildDelivery(count: number, now: bigint, generatedAtOffset: bigint): DeliveredRecord[] {
+export function buildDelivery(count: number, now: bigint, generatedAtOffset: AgeOffset): DeliveredRecord[] {
+  const offsetAt = typeof generatedAtOffset === "function" ? generatedAtOffset : () => generatedAtOffset;
   const records: DeliveredRecord[] = [];
   for (let i = 0; i < count; i++) {
     const row = JSON.stringify({
@@ -22,7 +41,7 @@ export function buildDelivery(count: number, now: bigint, generatedAtOffset: big
     records.push({
       index: i,
       bytes: toHex(row),
-      generatedAt: now - generatedAtOffset,
+      generatedAt: now - offsetAt(i),
       sourceId: SOURCE_ID,
     });
   }

@@ -23,7 +23,7 @@ import {
 import { compileListing, supportedRuleIds } from "../compiler.js";
 import { commitmentMessage, deliveryCommitmentTypes, domainFor, purchaseTermsTypes, termsMessage } from "../eip712.js";
 import { naiveAcceptanceChecks } from "../naive.js";
-import { SOURCE_ID, assembleFile, buildDelivery, commitTo } from "../seller.js";
+import { SOURCE_ID, assembleFile, buildDelivery, commitTo, partiallyStale } from "../seller.js";
 import {
   ClaimType,
   claimTypeName,
@@ -48,7 +48,11 @@ const USDC_ABI = usdcArtifact().abi as Abi;
 const AMOUNT = 100_000_000n; // 100 USDC, 6 decimals
 const RECORD_COUNT = 500;
 const CHALLENGE_WINDOW = 30n;
+const FRESH_BY = 90n; // a minute and a half old
 const STALE_BY = 26n * 3600n; // yesterday's data
+const STALE_ONSET = 187; // the feed goes stale partway through the collection run
+/** Scenarios 1 and 2 are the same delivery, so they share one age policy. */
+const MIXED_AGES = partiallyStale(FRESH_BY, STALE_BY, STALE_ONSET);
 const DELIVERY_GRACE = 600n; // seconds the seller has to commit
 const FRESHNESS_TERM = "every record generated within the last 1 hour";
 const ROW_COUNT_TERM = "at least 500 records";
@@ -80,6 +84,7 @@ const verdict = (n: number, name: string, detail: string) => {
 const usd = (v: bigint) => `${(Number(v) / 1e6).toFixed(2)} USDC`;
 const iso = (t: bigint) => new Date(Number(t) * 1000).toISOString().replace(".000Z", "Z");
 const dur = (s: bigint) => `${(Number(s) / 3600).toFixed(1)}h`;
+const age = (s: bigint) => (s < 3600n ? `${s}s` : dur(s));
 
 // ------------------------------------------------------------------ chain helpers
 
@@ -218,7 +223,7 @@ async function scenarioUnprotected() {
   const now = await chainNow();
 
   step(`Seller assembles ${RECORD_COUNT} correctly shaped ETH-USD records into one file.`);
-  const records = buildDelivery(RECORD_COUNT, now, STALE_BY);
+  const records = buildDelivery(RECORD_COUNT, now, MIXED_AGES);
   const delivery = await assembleFile(records, accounts.timestampAuthority, now);
   note(`file hash        ${delivery.blobHash.slice(0, 26)}...`);
   note(`blob timestamp   ${iso(delivery.blobTimestamp.timestampedAt)}`);
@@ -247,18 +252,22 @@ async function scenarioUnprotected() {
   const ages = records.map((r) => now - r.generatedAt);
   const oldest = ages.reduce((a, b) => (b > a ? b : a), 0n);
   const newest = ages.reduce((a, b) => (b < a ? b : a), ages[0]);
-  for (const i of [0, 1, RECORD_COUNT - 1]) {
-    note(`record ${String(i).padStart(3)}  generatedAt ${iso(records[i].generatedAt)}  age ${dur(ages[i])}`);
+  const staleCount = ages.filter((a) => a > 3600n).length;
+  const firstStale = ages.findIndex((a) => a > 3600n);
+  for (const i of [0, firstStale - 1, firstStale, RECORD_COUNT - 1]) {
+    note(`record ${String(i).padStart(3)}  generatedAt ${iso(records[i].generatedAt)}  age ${age(ages[i])}`);
   }
-  note(`all ${RECORD_COUNT} records: age between ${dur(newest)} and ${dur(oldest)}`);
-  item(false, `every record predates the one hour window by more than 20 hours`);
-  note(`the file is new. the data in it is yesterday's. the timestamp is honest.`);
+  note(`ages range from ${age(newest)} to ${age(oldest)}`);
+  note(`the first ${firstStale} records are current, so the head of the file looks clean`);
+  item(false, `${staleCount} of ${RECORD_COUNT} records predate the one hour window by more than 20 hours`);
+  note(`the file is new. half the data in it is yesterday's. the timestamp is honest.`);
   note(`blob existence time is not record generation time. that gap is the whole attack.`);
 
   verdict(
     1,
     "UNPROTECTED",
-    `naive checks all ${allPass ? "passed" : "failed"}, ${usd(AMOUNT)} settled, data was ${dur(oldest)} stale`,
+    `naive checks all ${allPass ? "passed" : "failed"}, ${usd(AMOUNT)} settled, ` +
+      `${staleCount} of ${RECORD_COUNT} records up to ${dur(oldest)} stale`,
   );
 }
 
@@ -306,7 +315,7 @@ async function scenarioBreachProved() {
   item(true, `re-offer of RECORD_GENERATION_TIME accepted, ${usd(await balance(escrow))} escrowed`);
 
   step("Seller delivers. The upstream issuer signs a commitment over bound leaves.");
-  const records = buildDelivery(RECORD_COUNT, now, STALE_BY);
+  const records = buildDelivery(RECORD_COUNT, now, MIXED_AGES);
   const tree = commitTo(records);
   note(`merkleRoot       ${tree.root}`);
   note(`leafCount        ${tree.leafCount}, inside the signed struct`);
@@ -321,7 +330,9 @@ async function scenarioBreachProved() {
   const violation = findFirstViolation(records, conditions[0]);
   if (!violation) throw new Error("expected a violation");
   item(false, `universal freshness: ${total} of ${RECORD_COUNT} records violate it`);
-  note(`first violating record is index ${violation.record.index}`);
+  note(`first violating record is index ${violation.record.index}, not index 0`);
+  note(`records 0 to ${violation.record.index - 1} are inside the window, so a spot`);
+  note(`check of the head of the file finds nothing wrong`);
   note(`generatedAt ${iso(violation.record.generatedAt)}, threshold ${iso(BigInt(conditions[0].threshold))}`);
   note(`short by ${dur(BigInt(conditions[0].threshold) - violation.record.generatedAt)}`);
 
@@ -359,9 +370,14 @@ async function scenarioBreachProved() {
     }
   }
   item(true, `refunded ${usd(buyerAfter - buyerBefore)} to the buyer, escrow holds ${usd(await balance(escrow))}`);
-  item(true, `emitted BreachProved with offendingIndex ${offending}`);
+  item(true, `emitted BreachProved with offendingIndex ${offending}, 1 of ${total} violating records`);
+  note(`the other ${total - 1} counterexamples were never needed and never submitted`);
 
-  verdict(2, "BREACH_PROVED", `one counterexample at index ${offending} reversed settlement, no arbiter`);
+  verdict(
+    2,
+    "BREACH_PROVED",
+    `${total} of ${RECORD_COUNT} records violate, one counterexample at index ${offending} refunded in full`,
+  );
 }
 
 // ------------------------------------------------------------------ 3. RELEASE
