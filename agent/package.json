@@ -1,0 +1,17 @@
+{
+  "name": "@recourse/agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "tsx src/demo/run.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.7.0"
+  }
+}
