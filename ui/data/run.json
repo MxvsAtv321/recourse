@@ -1,0 +1,266 @@
+{
+  "meta": {
+    "chainId": 31337,
+    "rpc": "http://127.0.0.1:8545",
+    "capturedAt": "2026-08-10T22:54:53.059Z",
+    "chainTime": "1786402545",
+    "blockNumber": "17",
+    "escrow": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+    "usdc": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+    "accounts": {
+      "buyer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "seller": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "upstream": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "timestampAuthority": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"
+    },
+    "assetSymbol": "USDC",
+    "assetDecimals": 6
+  },
+  "unprotected": {
+    "recordCount": 500,
+    "checks": [
+      {
+        "name": "row count",
+        "passed": true,
+        "detail": "500 records, expected 500"
+      },
+      {
+        "name": "schema shape",
+        "passed": true,
+        "detail": "every record parses and carries pair, seq, priceE8"
+      },
+      {
+        "name": "file hash matches timestamp",
+        "passed": true,
+        "detail": "0xa0a5bdc72b7f54ce..."
+      },
+      {
+        "name": "signed blob timestamp authentic",
+        "passed": true,
+        "detail": "signed by 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"
+      },
+      {
+        "name": "blob timestamp inside window",
+        "passed": true,
+        "detail": "file existed 0s ago, window is 3600s"
+      }
+    ],
+    "allPassed": true,
+    "payment": {
+      "amount": "100000000",
+      "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "txHash": "0x89df44d5d5f1a12b9f030b1b303a46f34a93797ca467f596e16682c32c021d21",
+      "blockNumber": "5"
+    },
+    "blobTimestamp": {
+      "at": "1786402492",
+      "issuer": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
+      "blobHash": "0xa0a5bdc72b7f54ce3392ddc1d081e9ca24d319039102eaae014cca85c0e6ead4"
+    },
+    "reveal": {
+      "windowSeconds": "3600",
+      "staleCount": 251,
+      "freshCount": 249,
+      "firstStaleIndex": 187,
+      "oldestAgeSeconds": "93600",
+      "newestAgeSeconds": "90",
+      "samples": [
+        {
+          "index": 0,
+          "generatedAt": "1786402402",
+          "ageSeconds": "90",
+          "stale": false
+        },
+        {
+          "index": 186,
+          "generatedAt": "1786402402",
+          "ageSeconds": "90",
+          "stale": false
+        },
+        {
+          "index": 187,
+          "generatedAt": "1786308892",
+          "ageSeconds": "93600",
+          "stale": true
+        },
+        {
+          "index": 188,
+          "generatedAt": "1786308892",
+          "ageSeconds": "93600",
+          "stale": true
+        },
+        {
+          "index": 499,
+          "generatedAt": "1786308892",
+          "ageSeconds": "93600",
+          "stale": true
+        }
+      ]
+    }
+  },
+  "protectedPurchase": {
+    "specHash": "0x72386949aa04d064b54138669f8d740c69d4deba0591504c4e66b03d885a640f",
+    "amount": "100000000",
+    "challengeWindowSeconds": "30",
+    "deliveryDeadline": "1786403092",
+    "conditions": [
+      {
+        "conditionId": 1,
+        "sourceQuote": "every record generated within the last 1 hour",
+        "ruleId": "record-freshness-hours",
+        "claimType": "RECORD_GENERATION_TIME",
+        "quantifier": "UNIVERSAL",
+        "opcode": "TIMESTAMP_GTE",
+        "threshold": "1786398892",
+        "thresholdKind": "timestamp",
+        "permittedIssuer": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+        "expectedSourceId": "0xc53fef9f35628ff5bf2cd4cc96a259445f5e327e5cb0d4c121b014281aa142b7",
+        "settlement": "one counterexample",
+        "protectedByRule": true
+      },
+      {
+        "conditionId": 2,
+        "sourceQuote": "at least 500 records",
+        "ruleId": "row-count-at-least",
+        "claimType": "ROW_COUNT",
+        "quantifier": "SCALAR",
+        "opcode": "UINT_GTE",
+        "threshold": "500",
+        "thresholdKind": "count",
+        "permittedIssuer": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+        "expectedSourceId": "0xc53fef9f35628ff5bf2cd4cc96a259445f5e327e5cb0d4c121b014281aa142b7",
+        "settlement": "direct evaluation at release",
+        "protectedByRule": true
+      }
+    ],
+    "rejectedOffer": {
+      "conditionId": 1,
+      "error": "ClaimTypeMismatch",
+      "offeredEstablishes": "BLOB_EXISTENCE_TIME",
+      "conditionRequires": "RECORD_GENERATION_TIME",
+      "offeredBy": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "whyRejected": "A signed timestamp over the delivered file establishes when the file existed. It says nothing about when the records inside it were generated.",
+      "escrowBalanceAfter": "0"
+    },
+    "openTx": "0x15088f04c49c0bf8613876a198af49fd923b6f944f1da43f275c770928fa6922",
+    "commitment": {
+      "merkleRoot": "0xea19d32c584fc13adc49527590e3f8033abcc50c6edfd70b61ca565ae06b7314",
+      "leafCount": "500",
+      "sourceId": "0xc53fef9f35628ff5bf2cd4cc96a259445f5e327e5cb0d4c121b014281aa142b7",
+      "issuer": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "txHashes": [
+        "0xf3f46374b4815fa47f87f0b932717bee0d48e92a9cb5073c1a5c6e4593e445ff",
+        "0x3035a54a5d9266213e95715fb161de873e5439fc868b7272ed016e799d48d9d3"
+      ],
+      "leafFormula": "keccak256(abi.encode(index, keccak256(recordBytes), generatedAt, sourceId))"
+    },
+    "scan": {
+      "totalRecords": 500,
+      "violations": 251,
+      "firstViolationIndex": 187,
+      "observedAt": "1786308892",
+      "thresholdAt": "1786398892",
+      "shortBySeconds": "90000",
+      "scalar": {
+        "conditionId": 2,
+        "observed": "500",
+        "threshold": "500",
+        "holds": true
+      }
+    },
+    "proof": {
+      "index": "187",
+      "pathLength": 9,
+      "verifiedLocally": true
+    },
+    "verification": [
+      {
+        "step": 1,
+        "label": "Leaf reconstructed",
+        "detail": "index, keccak256(recordBytes), generatedAt and sourceId, from the proof's own inputs"
+      },
+      {
+        "step": 2,
+        "label": "Inclusion verified",
+        "detail": "9 sibling hashes checked against the root inside the stored signed commitment"
+      },
+      {
+        "step": 3,
+        "label": "Index within committed count",
+        "detail": "index 187 sits inside the signed leafCount of 500"
+      },
+      {
+        "step": 4,
+        "label": "Commitment binding checked",
+        "detail": "the commitment names this purchase and this obligation"
+      },
+      {
+        "step": 5,
+        "label": "Issuer recovered",
+        "detail": "recovered signer equals the permitted issuer 0x90F79bf6EB2c4f870365E785982E1f101E93b906"
+      },
+      {
+        "step": 6,
+        "label": "Source matched",
+        "detail": "the leaf's sourceId equals the condition's expected source"
+      },
+      {
+        "step": 7,
+        "label": "Claim type accepted",
+        "detail": "record generation time is a property bound leaves can establish"
+      },
+      {
+        "step": 8,
+        "label": "Predicate violated",
+        "detail": "generation time is 90000 seconds short of the threshold"
+      }
+    ],
+    "settlement": {
+      "verdict": "BREACH_PROVED",
+      "refundAmount": "100000000",
+      "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "txHash": "0x4cabee140df3faf69647dc75422f8e606cb9f4de806df0a66ee62584381034a5",
+      "blockNumber": "9",
+      "offendingIndex": "187",
+      "escrowBalanceAfter": "0"
+    }
+  },
+  "release": {
+    "specHash": "0xc6c2ba0ac814927ad5480fc53896384d98ce46f5e27685ec9cc066027d8f5f2e",
+    "amount": "100000000",
+    "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    "txHash": "0xb88696e1991004ed8fda062ff3dcdfc9daf8bce9a19778ece67048db8ba38ec3",
+    "violations": 0,
+    "scalarObserved": "500",
+    "scalarThreshold": "500",
+    "earlyReleaseError": "ChallengeWindowOpen"
+  },
+  "unprotectable": {
+    "phrase": "high quality investment reports",
+    "reason": "no supported condition expresses this term",
+    "supportedRules": [
+      "row-count-at-least",
+      "row-count-exactly",
+      "record-freshness-hours",
+      "record-freshness-minutes",
+      "record-schema"
+    ],
+    "opcodes": [
+      "UINT_GTE",
+      "UINT_EQ",
+      "TIMESTAMP_GTE",
+      "BYTES32_EQ"
+    ],
+    "escrowOpened": false
+  },
+  "stalled": {
+    "specHash": "0x69718a75767e72c06d6e2f4f7ae315ef7375d65f18cb81109c406fcde3a4e437",
+    "amount": "100000000",
+    "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "txHash": "0x4a20f43f2ee206db03e756d20b43baafd33dfb2adcafa144a7d4f3db3db39a26",
+    "committed": 0,
+    "required": 2,
+    "deadline": "1786402544",
+    "earlyReclaimError": "DeliveryDeadlineNotReached"
+  }
+}

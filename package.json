@@ -1,0 +1,12 @@
+{
+  "name": "recourse",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix ui run build",
+    "dev": "npm --prefix ui run dev",
+    "start": "npm --prefix ui run start",
+    "capture": "agent/node_modules/.bin/tsx agent/src/demo/capture.ts",
+    "demo": "bash scripts/demo.sh",
+    "test": "$HOME/.foundry/bin/forge test -vv"
+  }
+}

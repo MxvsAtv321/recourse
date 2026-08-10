@@ -2,4 +2,6 @@ out/
 cache/
 broadcast/
 node_modules/
+.next/
+*.tsbuildinfo
 .DS_Store
