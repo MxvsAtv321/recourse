@@ -44,6 +44,8 @@ export type PurchaseTerms = {
   challengeWindow: bigint;
   /** Absolute timestamp. Past it, an undelivered purchase is reclaimable. */
   deliveryDeadline: bigint;
+  /** How long the seller has to answer an availability challenge. */
+  curePeriod: bigint;
 };
 
 export type EvidenceOffer = {
@@ -59,6 +61,18 @@ export type DeliveryCommitment = {
   /** Leaves in the committed tree. Signed, so a scalar row count binds to it. */
   leafCount: bigint;
   sourceId: Hex;
+  /** Content address of the committed payload file, signed by the issuer. */
+  payloadRef: Hex;
+};
+
+/** One leaf, opened. The answer to an availability challenge. */
+export type PayloadOpening = {
+  conditionId: number;
+  index: bigint;
+  recordBytes: Hex;
+  generatedAt: bigint;
+  sourceId: Hex;
+  merklePath: Hex[];
 };
 
 export type BreachProof = {

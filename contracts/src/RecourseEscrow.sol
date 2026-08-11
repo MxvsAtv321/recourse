@@ -47,6 +47,9 @@ struct PurchaseTerms {
     ///         Past it, an undelivered purchase is reclaimable by the buyer.
     ///         Non-delivery is the trivial breach.
     uint64 deliveryDeadline;
+    /// @notice How long the seller has to answer an availability challenge.
+    ///         Signed by both parties, like every other term.
+    uint64 curePeriod;
 }
 
 /// @notice What the seller's evidence actually proves, as opposed to what the
@@ -66,6 +69,21 @@ struct DeliveryCommitment {
     ///         the root. This is what lets a scalar row count settle directly.
     uint64 leafCount;
     bytes32 sourceId;
+    /// @notice Content address of the committed payload: the digest of the
+    ///         delivered file. Inside the signed struct, so the issuer binds
+    ///         the bytes it is attesting to and not merely their tree.
+    bytes32 payloadRef;
+}
+
+/// @notice One leaf, opened. This is what answering an availability challenge
+///         costs: the same shape a counterexample takes, minus the accusation.
+struct PayloadOpening {
+    uint8 conditionId;
+    uint256 index;
+    bytes recordBytes;
+    uint64 generatedAt;
+    bytes32 sourceId;
+    bytes32[] merklePath;
 }
 
 struct BreachProof {
@@ -98,7 +116,8 @@ contract RecourseEscrow {
     enum Verdict {
         RELEASE,
         BREACH_PROVED,
-        RECLAIM
+        RECLAIM,
+        WITHHELD
     }
 
     struct Purchase {
@@ -111,7 +130,17 @@ contract RecourseEscrow {
         uint64 deliveredAt;
         uint8 conditionCount;
         uint8 committedCount;
+        uint8 availabilityRaised;
         State state;
+    }
+
+    /// @dev At most one open at a time. Committing a root is cheap; producing a
+    ///      leaf on demand is not, unless you actually hold the payload.
+    struct Availability {
+        bool open;
+        uint8 conditionId;
+        uint64 raisedAt;
+        uint256 index;
     }
 
     /// @dev The stored, signed commitment. `specHash` and `conditionId` are held
@@ -124,19 +153,26 @@ contract RecourseEscrow {
         bytes32 specHash;
         bytes32 merkleRoot;
         bytes32 sourceId;
+        bytes32 payloadRef;
         address issuer; // recovered from the signature, never supplied
     }
+
+    /// @dev Bounds buyer griefing. Each challenge costs the seller one answer
+    ///      and pauses the clock, so the count cannot be open ended.
+    uint8 private constant MAX_AVAILABILITY_CHALLENGES = 3;
 
     bytes32 private constant CONDITION_TYPEHASH = keccak256(
         "Condition(uint8 conditionId,uint8 requires,uint8 quantifier,uint8 opcode,bytes32 threshold,address permittedIssuer,bytes32 expectedSourceId,string sourceQuote)"
     );
 
     bytes32 private constant PURCHASE_TERMS_TYPEHASH = keccak256(
-        "PurchaseTerms(bytes32 purchaseId,address buyer,address seller,uint256 amount,address asset,Condition[] conditions,uint64 challengeWindow,uint64 deliveryDeadline)Condition(uint8 conditionId,uint8 requires,uint8 quantifier,uint8 opcode,bytes32 threshold,address permittedIssuer,bytes32 expectedSourceId,string sourceQuote)"
+        "PurchaseTerms(bytes32 purchaseId,address buyer,address seller,uint256 amount,address asset,Condition[] conditions,uint64 challengeWindow,uint64 deliveryDeadline,uint64 curePeriod)Condition(uint8 conditionId,uint8 requires,uint8 quantifier,uint8 opcode,bytes32 threshold,address permittedIssuer,bytes32 expectedSourceId,string sourceQuote)"
     );
 
     bytes32 private constant DELIVERY_COMMITMENT_TYPEHASH =
-        keccak256("DeliveryCommitment(bytes32 specHash,uint8 conditionId,bytes32 merkleRoot,uint64 leafCount,bytes32 sourceId)");
+        keccak256(
+            "DeliveryCommitment(bytes32 specHash,uint8 conditionId,bytes32 merkleRoot,uint64 leafCount,bytes32 sourceId,bytes32 payloadRef)"
+        );
 
     bytes32 private constant DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
@@ -145,12 +181,17 @@ contract RecourseEscrow {
 
     mapping(bytes32 => Purchase) private _purchases;
     mapping(bytes32 => mapping(uint8 => StoredCommitment)) private _commitments;
+    mapping(bytes32 => Availability) private _availability;
 
     event PurchaseOpened(bytes32 indexed specHash, address indexed buyer, address indexed seller, uint256 amount);
     event DeliveryCommitted(bytes32 indexed specHash, uint8 indexed conditionId, bytes32 merkleRoot, address issuer);
     event Settled(bytes32 indexed specHash, Verdict verdict, address indexed paidTo, uint256 amount);
     event BreachProved(bytes32 indexed specHash, uint8 indexed conditionId, uint256 offendingIndex);
     event ScalarConditionFailed(bytes32 indexed specHash, uint8 indexed conditionId, bytes32 observed, bytes32 threshold);
+    event AvailabilityChallenged(bytes32 indexed specHash, uint8 indexed conditionId, uint256 index, uint64 curePeriodEnds);
+    event AvailabilityAnswered(
+        bytes32 indexed specHash, uint8 indexed conditionId, uint256 index, bytes recordBytes, uint64 generatedAt
+    );
     event Reclaimed(bytes32 indexed specHash, address indexed buyer, uint8 committed, uint8 required);
 
     error PurchaseExists();
@@ -188,6 +229,16 @@ contract RecourseEscrow {
     error UnsettleableScalarCondition();
     error UnsettleableUniversalCondition();
     error ZeroAddressSignature();
+    error ZeroPayloadRef();
+    error ZeroCurePeriod();
+    error NotBuyer();
+    error AvailabilityChallengeOpen();
+    error NoAvailabilityChallenge();
+    error TooManyAvailabilityChallenges();
+    error CurePeriodExpired();
+    error CurePeriodRunning();
+    error OpeningIndexMismatch();
+    error OpeningConditionMismatch();
 
     constructor() {
         _domainSeparator = keccak256(
@@ -237,7 +288,8 @@ contract RecourseEscrow {
                 terms.asset,
                 keccak256(abi.encodePacked(conditionHashes)),
                 terms.challengeWindow,
-                terms.deliveryDeadline
+                terms.deliveryDeadline,
+                terms.curePeriod
             )
         );
         return _typed(structHash);
@@ -247,7 +299,13 @@ contract RecourseEscrow {
         return _typed(
             keccak256(
                 abi.encode(
-                    DELIVERY_COMMITMENT_TYPEHASH, c.specHash, c.conditionId, c.merkleRoot, c.leafCount, c.sourceId
+                    DELIVERY_COMMITMENT_TYPEHASH,
+                    c.specHash,
+                    c.conditionId,
+                    c.merkleRoot,
+                    c.leafCount,
+                    c.sourceId,
+                    c.payloadRef
                 )
             )
         );
@@ -283,6 +341,7 @@ contract RecourseEscrow {
         if (_recover(specHash, sellerSig) != terms.seller) revert BadSellerSignature();
 
         if (terms.deliveryDeadline <= block.timestamp) revert DeadlineInPast();
+        if (terms.curePeriod == 0) revert ZeroCurePeriod();
 
         // Each conditionId keys one commitment slot. Duplicates would collide, the
         // second commitment would revert, and the purchase could never reach
@@ -329,6 +388,7 @@ contract RecourseEscrow {
             deliveredAt: 0,
             conditionCount: uint8(n),
             committedCount: 0,
+            availabilityRaised: 0,
             state: State.OPEN
         });
 
@@ -362,6 +422,7 @@ contract RecourseEscrow {
         if (issuer != c.permittedIssuer) revert UnpermittedIssuer();
         if (commitment.sourceId != c.expectedSourceId) revert SourceIdMismatch();
         if (commitment.leafCount == 0) revert ZeroLeafCount();
+        if (commitment.payloadRef == bytes32(0)) revert ZeroPayloadRef();
 
         StoredCommitment storage sc = _commitments[specHash][commitment.conditionId];
         if (sc.exists) revert CommitmentExists();
@@ -372,6 +433,7 @@ contract RecourseEscrow {
         sc.merkleRoot = commitment.merkleRoot;
         sc.leafCount = commitment.leafCount;
         sc.sourceId = commitment.sourceId;
+        sc.payloadRef = commitment.payloadRef;
         sc.issuer = issuer;
 
         p.committedCount += 1;
@@ -405,6 +467,102 @@ contract RecourseEscrow {
     }
 
     // ------------------------------------------------------------------
+    // 3b. Availability. Committing a root is not delivering a payload.
+    // ------------------------------------------------------------------
+
+    /// @notice The buyer names one leaf it cannot obtain. Committing a root is
+    ///         cheap and says nothing about whether the payload was ever sent,
+    ///         so without this a seller could commit, send nothing, wait out the
+    ///         window and collect. Release is paused until this is answered.
+    function raiseAvailabilityChallenge(PurchaseTerms calldata terms, uint256 conditionIndex, uint256 index)
+        external
+    {
+        bytes32 specHash = specHashOf(terms);
+        Purchase storage p = _purchases[specHash];
+        if (p.state == State.NONE) revert UnknownPurchase();
+        if (p.state != State.DELIVERED) revert WrongState();
+        if (msg.sender != p.buyer) revert NotBuyer();
+        if (block.timestamp >= uint256(p.deliveredAt) + uint256(p.challengeWindow)) revert ChallengeWindowClosed();
+
+        Availability storage a = _availability[specHash];
+        if (a.open) revert AvailabilityChallengeOpen();
+        if (p.availabilityRaised >= MAX_AVAILABILITY_CHALLENGES) revert TooManyAvailabilityChallenges();
+
+        Condition calldata c = terms.conditions[conditionIndex];
+        StoredCommitment storage sc = _commitments[specHash][c.conditionId];
+        if (!sc.exists) revert NoCommitment();
+        if (index >= uint256(sc.leafCount)) revert LeafIndexBeyondCommittedCount();
+
+        a.open = true;
+        a.conditionId = c.conditionId;
+        a.raisedAt = uint64(block.timestamp);
+        a.index = index;
+        p.availabilityRaised += 1;
+
+        emit AvailabilityChallenged(specHash, c.conditionId, index, uint64(block.timestamp) + terms.curePeriod);
+    }
+
+    /// @notice Anyone holding the payload may answer, because availability is a
+    ///         property of the payload and not of who is speaking. The opening
+    ///         is the same shape as a counterexample, minus the accusation, and
+    ///         it is emitted in full: answering hands the buyer exactly the bytes
+    ///         a breach proof needs.
+    function answerAvailabilityChallenge(
+        PurchaseTerms calldata terms,
+        uint256 conditionIndex,
+        PayloadOpening calldata opening
+    ) external {
+        bytes32 specHash = specHashOf(terms);
+        Purchase storage p = _purchases[specHash];
+        if (p.state == State.NONE) revert UnknownPurchase();
+        if (p.state != State.DELIVERED) revert WrongState();
+
+        Availability storage a = _availability[specHash];
+        if (!a.open) revert NoAvailabilityChallenge();
+        if (block.timestamp >= uint256(a.raisedAt) + uint256(terms.curePeriod)) revert CurePeriodExpired();
+
+        Condition calldata c = terms.conditions[conditionIndex];
+        if (c.conditionId != a.conditionId || opening.conditionId != a.conditionId) {
+            revert OpeningConditionMismatch();
+        }
+        if (opening.index != a.index) revert OpeningIndexMismatch();
+        if (opening.sourceId != c.expectedSourceId) revert SourceIdMismatch();
+
+        StoredCommitment storage sc = _commitments[specHash][a.conditionId];
+        bytes32 leaf = MerkleBreachVerifier.leafOf(
+            opening.index, keccak256(opening.recordBytes), opening.generatedAt, opening.sourceId
+        );
+        if (!MerkleBreachVerifier.verifyInclusion(opening.merklePath, sc.merkleRoot, leaf)) {
+            revert MerkleInclusionFailed();
+        }
+
+        // The clock resumes where it paused, so a frivolous challenge costs the
+        // buyer gas and buys it no extra time.
+        p.deliveredAt = uint64(uint256(p.deliveredAt) + (block.timestamp - uint256(a.raisedAt)));
+        a.open = false;
+
+        emit AvailabilityAnswered(specHash, a.conditionId, opening.index, opening.recordBytes, opening.generatedAt);
+    }
+
+    /// @notice The cure period lapsed with no opening produced. A seller that
+    ///         cannot open one leaf of its own committed tree did not deliver.
+    function claimWithheld(PurchaseTerms calldata terms) external {
+        bytes32 specHash = specHashOf(terms);
+        Purchase storage p = _purchases[specHash];
+        if (p.state == State.NONE) revert UnknownPurchase();
+        if (p.state != State.DELIVERED) revert WrongState();
+
+        Availability storage a = _availability[specHash];
+        if (!a.open) revert NoAvailabilityChallenge();
+        if (block.timestamp < uint256(a.raisedAt) + uint256(terms.curePeriod)) revert CurePeriodRunning();
+
+        a.open = false;
+        p.state = State.REFUNDED;
+        _push(p.asset, p.buyer, p.amount);
+        emit Settled(specHash, Verdict.WITHHELD, p.buyer, p.amount);
+    }
+
+    // ------------------------------------------------------------------
     // 3b. Settle by silence, after evaluating the scalar claims.
     // ------------------------------------------------------------------
 
@@ -413,6 +571,7 @@ contract RecourseEscrow {
         Purchase storage p = _purchases[specHash];
         if (p.state == State.NONE) revert UnknownPurchase();
         if (p.state != State.DELIVERED) revert WrongState();
+        if (_availability[specHash].open) revert AvailabilityChallengeOpen();
         if (block.timestamp < uint256(p.deliveredAt) + uint256(p.challengeWindow)) revert ChallengeWindowOpen();
 
         // Scalar claims are not counterexample shaped. One row cannot disprove
@@ -540,6 +699,10 @@ contract RecourseEscrow {
 
     function purchaseOf(bytes32 specHash) external view returns (Purchase memory) {
         return _purchases[specHash];
+    }
+
+    function availabilityOf(bytes32 specHash) external view returns (Availability memory) {
+        return _availability[specHash];
     }
 
     function commitmentOf(bytes32 specHash, uint8 conditionId) external view returns (StoredCommitment memory) {

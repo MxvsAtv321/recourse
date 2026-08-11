@@ -80,6 +80,13 @@ export async function assembleFile(
   return { records, blobHash, blobTimestamp: await signBlobTimestamp(timestampIssuer, blobHash, assembledAt) };
 }
 
+/**
+ * The content address of the delivered payload: the digest of the serialised
+ * file. This is what the issuer binds itself to when it names where the
+ * committed bytes are retrievable.
+ */
+export const payloadRefOf = (records: DeliveredRecord[]): Hex => keccak256(serialiseDelivery(records));
+
 /** The Merkle commitment the upstream issuer will sign, over bound leaves. */
 export function commitTo(records: DeliveredRecord[]) {
   const leaves = records.map((r) => leafOf(r.index, keccak256(r.bytes), r.generatedAt, r.sourceId));

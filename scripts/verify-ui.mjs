@@ -27,6 +27,12 @@ let pass = 0;
 let fail = 0;
 const has = (needle) => raw.includes(needle) || text.includes(needle);
 
+function refute(label, needle) {
+  const ok = !has(String(needle));
+  console.log(`   ${ok ? "PASS" : "FAIL"}  ${label}  ->  absent: ${JSON.stringify(String(needle)).slice(0, 70)}`);
+  ok ? pass++ : fail++;
+}
+
 function check(label, needle) {
   const ok = has(String(needle));
   console.log(`   ${ok ? "PASS" : "FAIL"}  ${label}  ->  ${JSON.stringify(String(needle)).slice(0, 92)}`);
@@ -72,9 +78,22 @@ for (const c of p.conditions) {
   check(`condition ${c.conditionId} source phrase`, c.sourceQuote);
   check(`condition ${c.conditionId} opcode`, c.opcode);
 }
-check("protected count", `${p.conditions.length} of ${p.conditions.length} protected`);
+check("panel distinguishes assurance levels", "proved from delivery");
 check("scalar settlement named", "direct evaluation at release");
 check("universal settlement named", "one counterexample");
+
+console.log("\nFIX 2  scalar row count must not read as protection against short delivery");
+const scalar = p.conditions.find((c) => c.quantifier === "SCALAR");
+const universal = p.conditions.find((c) => c.quantifier === "UNIVERSAL");
+check("threshold unit is leaves claimed", `${Number(scalar.threshold).toLocaleString("en-US")} leaves claimed`);
+check("scalar labelled issuer attested", "Issuer attested");
+check("panel splits proved from attested", "1 proved from delivery");
+check("panel names attested count", "1 issuer attested");
+check("scalar caveat spells out the gap", "nor that the buyer received that many records");
+check("universal claim still says Protected", ">Protected<");
+refute("no bare row unit", `${Number(scalar.threshold).toLocaleString("en-US")} rows`);
+refute("no blanket protected count", `${p.conditions.length} of ${p.conditions.length} protected`);
+console.log(`   note  condition 1 (${universal.claimType}) keeps its Protected label, unchanged`);
 
 console.log("\nVIEW 3  claim-type rejection, expandable to offered vs required");
 check("revert name from chain", p.rejectedOffer.error);

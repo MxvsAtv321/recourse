@@ -176,23 +176,31 @@ export default function Page() {
           <h2>What the listing promised, and what we can prove.</h2>
           <p>
             Each phrase in the seller&rsquo;s listing is compiled into a machine-checkable condition, or it is not
-            protected at all. The phrase that generated each condition stays attached to it.
+            protected at all. The phrase that generated each condition stays attached to it, and so does the
+            difference between what we can prove from the delivery and what we are taking the issuer&rsquo;s word for.
           </p>
         </div>
 
         <div className="card">
           <div className="card-head">
             <span className="card-title">Protection panel · {prot.conditions.length} conditions</span>
-            <span className="badge">{prot.conditions.length} of {prot.conditions.length} protected</span>
+            <span className="badge">
+              {prot.conditions.filter((c) => c.quantifier === "UNIVERSAL").length} proved from delivery ·{" "}
+              {prot.conditions.filter((c) => c.quantifier === "SCALAR").length} issuer attested
+            </span>
           </div>
-          {prot.conditions.map((c) => (
+          {prot.conditions.map((c) => {
+            const provedFromDelivery = c.quantifier === "UNIVERSAL";
+            return (
             <div className="condition" key={c.conditionId}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "flex-start", flexWrap: "wrap" }}>
                 <blockquote className="quote" style={{ margin: 0, flex: "1 1 320px" }}>
                   <span className="quote-src">From the listing</span>
                   &ldquo;{c.sourceQuote}&rdquo;
                 </blockquote>
-                <span className="badge">Protected</span>
+                <span className={provedFromDelivery ? "badge" : "badge plain"}>
+                  {provedFromDelivery ? "Protected" : "Issuer attested"}
+                </span>
               </div>
               <dl className="spec-grid">
                 <div>
@@ -209,15 +217,26 @@ export default function Page() {
                 </div>
                 <div>
                   <dt>Threshold</dt>
-                  <dd>{c.thresholdKind === "timestamp" ? stamp(c.threshold) : `${Number(c.threshold).toLocaleString("en-US")} rows`}</dd>
+                  <dd>
+                    {c.thresholdKind === "timestamp"
+                      ? stamp(c.threshold)
+                      : `${Number(c.threshold).toLocaleString("en-US")} leaves claimed`}
+                  </dd>
                 </div>
                 <div>
                   <dt>Settles by</dt>
                   <dd>{c.settlement}</dd>
                 </div>
               </dl>
+              <p style={{ fontSize: "0.88rem", color: "var(--ink-3)", maxWidth: "62ch" }}>
+                {provedFromDelivery
+                  ? "Proved from leaves the buyer holds. A single record that breaks this refunds the purchase, so the seller cannot assert its way out of it."
+                  : "Establishes that the permitted issuer signed a commitment whose leaf count reads " +
+                    `${Number(c.threshold).toLocaleString("en-US")}. It does not establish that the tree holds that many leaves, nor that the buyer received that many records. Authentic evidence can still prove the wrong claim, and this is where that applies to us.`}
+              </p>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -300,8 +319,11 @@ export default function Page() {
             </div>
             <dl className="rows">
               <div className="row">
-                <dt>Conditions protected</dt>
-                <dd>{prot.conditions.length}</dd>
+                <dt>Conditions</dt>
+                <dd>
+                  {prot.conditions.filter((c) => c.quantifier === "UNIVERSAL").length} proved ·{" "}
+                  {prot.conditions.filter((c) => c.quantifier === "SCALAR").length} attested
+                </dd>
               </div>
               <div className="row">
                 <dt>Challenge window</dt>

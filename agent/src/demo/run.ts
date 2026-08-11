@@ -23,7 +23,7 @@ import {
 import { compileListing, supportedRuleIds } from "../compiler.js";
 import { commitmentMessage, deliveryCommitmentTypes, domainFor, purchaseTermsTypes, termsMessage } from "../eip712.js";
 import { naiveAcceptanceChecks } from "../naive.js";
-import { SOURCE_ID, assembleFile, buildDelivery, commitTo, partiallyStale } from "../seller.js";
+import { SOURCE_ID, assembleFile, buildDelivery, commitTo, partiallyStale, payloadRefOf } from "../seller.js";
 import {
   ClaimType,
   claimTypeName,
@@ -48,6 +48,7 @@ const USDC_ABI = usdcArtifact().abi as Abi;
 const AMOUNT = 100_000_000n; // 100 USDC, 6 decimals
 const RECORD_COUNT = 500;
 const CHALLENGE_WINDOW = 30n;
+const CURE_PERIOD = 20n;
 const FRESH_BY = 90n; // a minute and a half old
 const STALE_BY = 26n * 3600n; // yesterday's data
 const STALE_ONSET = 187; // the feed goes stale partway through the collection run
@@ -165,6 +166,7 @@ function makeTerms(purchaseId: Hex, conditions: Condition[], deliveryDeadline: b
     conditions,
     challengeWindow: CHALLENGE_WINDOW,
     deliveryDeadline,
+    curePeriod: CURE_PERIOD,
   };
 }
 
@@ -183,7 +185,7 @@ function compileProtected(phrases: string[], now: bigint): Condition[] {
   });
 }
 
-async function commitAll(terms: PurchaseTerms, specHash: Hex, root: Hex, leafCount: bigint) {
+async function commitAll(terms: PurchaseTerms, specHash: Hex, root: Hex, leafCount: bigint, payloadRef: Hex) {
   for (let i = 0; i < terms.conditions.length; i++) {
     const commitment: DeliveryCommitment = {
       specHash,
@@ -191,6 +193,7 @@ async function commitAll(terms: PurchaseTerms, specHash: Hex, root: Hex, leafCou
       merkleRoot: root,
       leafCount,
       sourceId: SOURCE_ID,
+      payloadRef,
     };
     await send(
       escrow,
@@ -219,7 +222,7 @@ function describeCondition(c: Condition) {
 // ------------------------------------------------------------------ 1. UNPROTECTED
 
 async function scenarioUnprotected() {
-  section("SCENARIO 1 of 5   UNPROTECTED PURCHASE, TODAY'S NORMAL");
+  section("SCENARIO 1 of 6   UNPROTECTED PURCHASE, TODAY'S NORMAL");
   const now = await chainNow();
 
   step(`Seller assembles ${RECORD_COUNT} correctly shaped ETH-USD records into one file.`);
@@ -274,7 +277,7 @@ async function scenarioUnprotected() {
 // ------------------------------------------------------------------ 2. BREACH_PROVED
 
 async function scenarioBreachProved() {
-  section("SCENARIO 2 of 5   THE SAME DELIVERY THROUGH RECOURSE");
+  section("SCENARIO 2 of 6   THE SAME DELIVERY THROUGH RECOURSE");
   const now = await chainNow();
 
   step("Compile the listing terms into machine-checkable conditions.");
@@ -320,7 +323,7 @@ async function scenarioBreachProved() {
   note(`merkleRoot       ${tree.root}`);
   note(`leafCount        ${tree.leafCount}, inside the signed struct`);
   note(`leaf = keccak256(abi.encode(index, keccak256(recordBytes), generatedAt, sourceId))`);
-  await commitAll(terms, specHash, tree.root, tree.leafCount);
+  await commitAll(terms, specHash, tree.root, tree.leafCount, payloadRefOf(records));
   item(true, `${conditions.length} commitments stored, challenge window open`);
 
   step("Buyer's verifier scans the delivery locally. No model call, no chain reads.");
@@ -383,7 +386,7 @@ async function scenarioBreachProved() {
 // ------------------------------------------------------------------ 3. RELEASE
 
 async function scenarioRelease() {
-  section("SCENARIO 3 of 5   COMPLIANT DELIVERY, NOBODY CHALLENGES");
+  section("SCENARIO 3 of 6   COMPLIANT DELIVERY, NOBODY CHALLENGES");
   const now = await chainNow();
 
   const conditions = compileProtected([FRESHNESS_TERM, ROW_COUNT_TERM], now);
@@ -398,7 +401,7 @@ async function scenarioRelease() {
 
   const records = buildDelivery(RECORD_COUNT, now, 120n);
   const tree = commitTo(records);
-  await commitAll(terms, specHash, tree.root, tree.leafCount);
+  await commitAll(terms, specHash, tree.root, tree.leafCount, payloadRefOf(records));
   item(true, `all ${RECORD_COUNT} records generated 2 minutes ago, leafCount ${tree.leafCount} committed`);
 
   step("Buyer's verifier scans every record and finds nothing to challenge.");
@@ -421,7 +424,7 @@ async function scenarioRelease() {
 // ------------------------------------------------------------------ 4. UNPROTECTABLE
 
 async function scenarioUnprotectable() {
-  section("SCENARIO 4 of 5   A TERM THAT MAPS TO NO SUPPORTED CONDITION");
+  section("SCENARIO 4 of 6   A TERM THAT MAPS TO NO SUPPORTED CONDITION");
   const now = await chainNow();
 
   const listing = "high quality investment reports";
@@ -453,7 +456,7 @@ async function scenarioUnprotectable() {
 // ------------------------------------------------------------------ 5. STALLED
 
 async function scenarioStalled() {
-  section("SCENARIO 5 of 5   THE SELLER TAKES THE MONEY AND STALLS");
+  section("SCENARIO 5 of 6   THE SELLER TAKES THE MONEY AND STALLS");
   const now = await chainNow();
 
   const conditions = compileProtected([FRESHNESS_TERM, ROW_COUNT_TERM], now);
@@ -494,6 +497,59 @@ async function scenarioStalled() {
   verdict(5, "STALLED", `delivery deadline passed with 0 of 2 commitments, buyer reclaimed in full`);
 }
 
+// ------------------------------------------------------------------ 6. WITHHELD
+
+async function scenarioWithheld() {
+  section("SCENARIO 6 of 6   THE SELLER COMMITS A ROOT AND SENDS NOTHING");
+  const now = await chainNow();
+
+  const conditions = compileProtected([FRESHNESS_TERM, ROW_COUNT_TERM], now);
+  const terms = makeTerms(pad("0x04", { size: 32 }), conditions, now + DELIVERY_GRACE);
+  const specHash = (await read("specHashOf", [terms])) as Hex;
+
+  step("A normal protected purchase opens and the seller commits on chain.");
+  await send(
+    escrow,
+    ESCROW_ABI,
+    "openPurchase",
+    [terms, offersFor(conditions), await signTerms(terms, accounts.buyer), await signTerms(terms, accounts.seller)],
+    accounts.seller,
+  );
+  const records = buildDelivery(RECORD_COUNT, now, MIXED_AGES);
+  const tree = commitTo(records);
+  const payloadRef = payloadRefOf(records);
+  await commitAll(terms, specHash, tree.root, tree.leafCount, payloadRef);
+  item(true, `commitments stored, purchase is DELIVERED, challenge window running`);
+  note(`merkleRoot  ${tree.root.slice(0, 26)}...`);
+  note(`payloadRef  ${payloadRef.slice(0, 26)}...  the content address the issuer signed`);
+
+  step("The payload itself is never sent. The buyer has a root and nothing to open it with.");
+  note(`a breach proof needs index, recordBytes, generatedAt and a merklePath`);
+  note(`none of which are on chain. before this fix the seller simply waited.`);
+  const reclaimErr = await expectRevert(escrow, ESCROW_ABI, "reclaim", [terms], accounts.buyer);
+  item(true, `reclaim cannot help: it reverts with ${reclaimErr}, the commitment left OPEN`);
+
+  step("The buyer contests availability, naming one leaf it cannot obtain.");
+  const challengedIndex = 42n;
+  await send(escrow, ESCROW_ABI, "raiseAvailabilityChallenge", [terms, 0n, challengedIndex], accounts.buyer);
+  item(true, `challenge raised on leaf ${challengedIndex}, cure period ${CURE_PERIOD}s`);
+  const releaseErr = await expectRevert(escrow, ESCROW_ABI, "release", [terms], accounts.seller);
+  item(true, `release is now blocked: ${releaseErr}`);
+  const earlyErr = await expectRevert(escrow, ESCROW_ABI, "claimWithheld", [terms], accounts.buyer);
+  item(true, `claiming before the cure period reverts with ${earlyErr}`);
+
+  step("The seller does not answer. It cannot open a leaf it never delivered.");
+  await advanceTime(Number(CURE_PERIOD) + 1);
+  const before = await balance(accounts.buyer.address);
+  await send(escrow, ESCROW_ABI, "claimWithheld", [terms], accounts.buyer);
+  const after = await balance(accounts.buyer.address);
+  item(true, `refunded ${usd(after - before)} in full, escrow holds ${usd(await balance(escrow))}`);
+  note(`answering would have handed the buyer the very bytes a counterexample needs,`);
+  note(`so a seller holding bad records is caught either way.`);
+
+  verdict(6, "WITHHELD", `commitment without delivery, cure period lapsed unanswered, buyer refunded`);
+}
+
 // ------------------------------------------------------------------ main
 
 async function main() {
@@ -510,7 +566,9 @@ async function main() {
   console.log(`  buyer      ${accounts.buyer.address}`);
   console.log(`  seller     ${accounts.seller.address}`);
   console.log(`  upstream   ${accounts.upstream.address}  (the source of record, still trusted)`);
-  console.log(`  tsa        ${accounts.timestampAuthority.address}  (blob timestamps, honest and irrelevant)`);
+  console.log(
+    `  timestamp authority  ${accounts.timestampAuthority.address}  (blob timestamps, honest and irrelevant)`,
+  );
 
   await send(usdc, USDC_ABI, "mint", [accounts.buyer.address, 10_000_000_000n], accounts.deployer);
   await send(usdc, USDC_ABI, "approve", [escrow, 2n ** 256n - 1n], accounts.buyer);
@@ -520,6 +578,7 @@ async function main() {
   await scenarioRelease();
   await scenarioUnprotectable();
   await scenarioStalled();
+  await scenarioWithheld();
 
   section("SUMMARY");
   console.log("SCENARIO 1 VERDICT: UNPROTECTED");
@@ -527,6 +586,7 @@ async function main() {
   console.log("SCENARIO 3 VERDICT: RELEASE");
   console.log("SCENARIO 4 VERDICT: UNPROTECTABLE");
   console.log("SCENARIO 5 VERDICT: STALLED");
+  console.log("SCENARIO 6 VERDICT: WITHHELD");
   rule("=");
 }
 

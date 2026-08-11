@@ -20,7 +20,7 @@ import {
   termsMessage,
 } from "./eip712.js";
 import { naiveAcceptanceChecks } from "./naive.js";
-import { SOURCE_ID, assembleFile, buildDelivery, commitTo, partiallyStale } from "./seller.js";
+import { SOURCE_ID, assembleFile, buildDelivery, commitTo, partiallyStale, payloadRefOf } from "./seller.js";
 import {
   ClaimType,
   Quantifier,
@@ -31,13 +31,21 @@ import {
   type EvidenceOffer,
   type PurchaseTerms,
 } from "./types.js";
-import { buildBreachProof, countViolations, evaluateScalar, findFirstViolation, proofChecksOut } from "./verifier.js";
+import {
+  buildBreachProof,
+  buildOpening,
+  countViolations,
+  evaluateScalar,
+  findFirstViolation,
+  proofChecksOut,
+} from "./verifier.js";
 
 // ------------------------------------------------------------------ constants
 
 export const AMOUNT = 100_000_000n; // 100 USDC, 6 decimals
 export const RECORD_COUNT = 500;
 export const CHALLENGE_WINDOW = 30n;
+export const CURE_PERIOD = 20n;
 const FRESH_BY = 90n;
 const STALE_BY = 26n * 3600n;
 const STALE_ONSET = 187;
@@ -137,10 +145,17 @@ function makeTerms(purchaseId: Hex, conditions: Condition[], deliveryDeadline: b
     conditions,
     challengeWindow: CHALLENGE_WINDOW,
     deliveryDeadline,
+    curePeriod: CURE_PERIOD,
   };
 }
 
-async function commitAll(terms: PurchaseTerms, specHash: Hex, root: Hex, leafCount: bigint): Promise<Hex[]> {
+async function commitAll(
+  terms: PurchaseTerms,
+  specHash: Hex,
+  root: Hex,
+  leafCount: bigint,
+  payloadRef: Hex,
+): Promise<Hex[]> {
   const hashes: Hex[] = [];
   for (let i = 0; i < terms.conditions.length; i++) {
     const commitment: DeliveryCommitment = {
@@ -149,6 +164,7 @@ async function commitAll(terms: PurchaseTerms, specHash: Hex, root: Hex, leafCou
       merkleRoot: root,
       leafCount,
       sourceId: SOURCE_ID,
+      payloadRef,
     };
     const receipt = await send(
       escrow,
@@ -195,6 +211,7 @@ export async function runAll(): Promise<RunArtifact> {
   const release = await runRelease();
   const unprotectable = runUnprotectable();
   const stalled = await runStalled();
+  const withheld = await runWithheld();
 
   const block = await publicClient.getBlock();
   return {
@@ -220,6 +237,7 @@ export async function runAll(): Promise<RunArtifact> {
     release,
     unprotectable,
     stalled,
+    withheld,
   };
 }
 
@@ -312,7 +330,7 @@ async function runProtected(): Promise<RunArtifact["protectedPurchase"]> {
 
   const records = buildDelivery(RECORD_COUNT, now, MIXED_AGES);
   const tree = commitTo(records);
-  const commitTxs = await commitAll(terms, specHash, tree.root, tree.leafCount);
+  const commitTxs = await commitAll(terms, specHash, tree.root, tree.leafCount, payloadRefOf(records));
 
   const scalar = evaluateScalar(conditions[1], tree.leafCount);
   const violations = countViolations(records, conditions[0]);
@@ -343,6 +361,7 @@ async function runProtected(): Promise<RunArtifact["protectedPurchase"]> {
     specHash,
     amount: AMOUNT.toString(),
     challengeWindowSeconds: CHALLENGE_WINDOW.toString(),
+    curePeriodSeconds: CURE_PERIOD.toString(),
     deliveryDeadline: deadline.toString(),
     conditions: conditionViews,
     rejectedOffer: {
@@ -360,6 +379,7 @@ async function runProtected(): Promise<RunArtifact["protectedPurchase"]> {
       merkleRoot: tree.root,
       leafCount: tree.leafCount.toString(),
       sourceId: SOURCE_ID,
+      payloadRef: payloadRefOf(records),
       issuer: accounts.upstream.address,
       txHashes: commitTxs,
       leafFormula: "keccak256(abi.encode(index, keccak256(recordBytes), generatedAt, sourceId))",
@@ -418,7 +438,7 @@ async function runRelease(): Promise<RunArtifact["release"]> {
 
   const records = buildDelivery(RECORD_COUNT, now, 120n);
   const tree = commitTo(records);
-  await commitAll(terms, specHash, tree.root, tree.leafCount);
+  await commitAll(terms, specHash, tree.root, tree.leafCount, payloadRefOf(records));
 
   const scalar = evaluateScalar(conditions[1], tree.leafCount);
   const earlyError = await expectRevert(escrow, ESCROW_ABI, "release", [terms], accounts.seller);
@@ -486,5 +506,58 @@ async function runStalled(): Promise<RunArtifact["stalled"]> {
     required: p.conditionCount,
     deadline: deadline.toString(),
     earlyReclaimError: earlyError,
+  };
+}
+
+/**
+ * The seller commits a root and sends nothing. Before availability challenges
+ * existed this was strictly better for a dishonest seller than stalling,
+ * because the commitment moved the purchase out of OPEN and reclaim could no
+ * longer reach it.
+ */
+async function runWithheld(): Promise<RunArtifact["withheld"]> {
+  const now = await chainNow();
+  const compiled = compileProtected([FRESHNESS_TERM, ROW_COUNT_TERM], now);
+  const conditions = compiled.map((c) => (c.protectable ? c.condition : (null as never)));
+  const terms = makeTerms(pad("0x04", { size: 32 }), conditions, now + DELIVERY_GRACE);
+  const specHash = (await read("specHashOf", [terms])) as Hex;
+
+  await send(
+    escrow,
+    ESCROW_ABI,
+    "openPurchase",
+    [terms, offersFor(conditions), await signTerms(terms, accounts.buyer), await signTerms(terms, accounts.seller)],
+    accounts.seller,
+  );
+
+  // A real tree over real records, committed on chain. The payload itself is
+  // never sent to the buyer.
+  const records = buildDelivery(RECORD_COUNT, now, MIXED_AGES);
+  const tree = commitTo(records);
+  const payloadRef = payloadRefOf(records);
+  await commitAll(terms, specHash, tree.root, tree.leafCount, payloadRef);
+
+  const challengedIndex = 42n;
+  await send(escrow, ESCROW_ABI, "raiseAvailabilityChallenge", [terms, 0n, challengedIndex], accounts.buyer);
+
+  const releaseBlocked = await expectRevert(escrow, ESCROW_ABI, "release", [terms], accounts.seller);
+  const earlyClaim = await expectRevert(escrow, ESCROW_ABI, "claimWithheld", [terms], accounts.buyer);
+
+  await advanceTime(Number(CURE_PERIOD) + 1);
+  const before = await balance(accounts.buyer.address);
+  const receipt = await send(escrow, ESCROW_ABI, "claimWithheld", [terms], accounts.buyer);
+  const after = await balance(accounts.buyer.address);
+
+  return {
+    specHash,
+    amount: (after - before).toString(),
+    to: accounts.buyer.address,
+    txHash: receipt.transactionHash,
+    payloadRef,
+    challengedIndex: challengedIndex.toString(),
+    curePeriodSeconds: CURE_PERIOD.toString(),
+    answered: false,
+    releaseBlockedError: releaseBlocked,
+    earlyClaimError: earlyClaim,
   };
 }

@@ -55,6 +55,7 @@ export type RunArtifact = {
     specHash: string;
     amount: string;
     challengeWindowSeconds: string;
+    curePeriodSeconds: string;
     deliveryDeadline: string;
     conditions: ConditionView[];
     rejectedOffer: {
@@ -71,6 +72,7 @@ export type RunArtifact = {
       merkleRoot: string;
       leafCount: string;
       sourceId: string;
+      payloadRef: string;
       issuer: string;
       txHashes: string[];
       leafFormula: string;
@@ -112,6 +114,18 @@ export type RunArtifact = {
     supportedRules: string[];
     opcodes: string[];
     escrowOpened: false;
+  };
+  withheld: {
+    specHash: string;
+    amount: string;
+    to: string;
+    txHash: string;
+    payloadRef: string;
+    challengedIndex: string;
+    curePeriodSeconds: string;
+    answered: false;
+    releaseBlockedError: string;
+    earlyClaimError: string;
   };
   stalled: {
     specHash: string;

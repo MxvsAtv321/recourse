@@ -12,6 +12,7 @@ import {
     EvidenceOffer,
     DeliveryCommitment,
     BreachProof,
+    PayloadOpening,
     ClaimType,
     Quantifier
 } from "../src/RecourseEscrow.sol";
@@ -32,6 +33,8 @@ contract RecourseTest is Test {
 
     uint256 constant AMOUNT = 100_000_000; // 100 USDC
     uint64 constant WINDOW = 60;
+    uint64 constant CURE = 20;
+    bytes32 constant PAYLOAD_REF = keccak256("payload-blob-v1");
     uint8 constant CONDITION_ID = 1;
     bytes32 constant SOURCE_ID = keccak256("COINBASE_ETH_USD_FEED");
     bytes32 constant OTHER_SOURCE_ID = keccak256("SOME_OTHER_FEED");
@@ -167,7 +170,8 @@ contract RecourseTest is Test {
             conditionId: CONDITION_ID,
             merkleRoot: root,
             leafCount: uint64(N),
-            sourceId: SOURCE_ID
+            sourceId: SOURCE_ID,
+            payloadRef: PAYLOAD_REF
         });
         bytes memory rogueSig = _sign(ROGUE_PK, escrow.commitmentDigest(c));
         vm.expectRevert(RecourseEscrow.UnpermittedIssuer.selector);
@@ -177,8 +181,7 @@ contract RecourseTest is Test {
         // submission makes that branch unreachable through the public API, so poison
         // the stored issuer directly to prove the settlement path also enforces it.
         _commit(terms, root, UPSTREAM_PK);
-        vm.store(address(escrow), bytes32(uint256(_commitmentSlot(specHash, CONDITION_ID)) + 4), bytes32(uint256(uint160(rogue))));
-        assertEq(escrow.commitmentOf(specHash, CONDITION_ID).issuer, rogue, "poisoned");
+        _poisonIssuer(specHash, CONDITION_ID, rogue);
 
         BreachProof memory proof = _proofFor(terms, leaves, STALE_INDEX);
         vm.expectRevert(RecourseEscrow.UnpermittedIssuer.selector);
@@ -244,7 +247,8 @@ contract RecourseTest is Test {
             conditionId: CONDITION_ID,
             merkleRoot: root,
             leafCount: uint64(N),
-            sourceId: SOURCE_ID
+            sourceId: SOURCE_ID,
+            payloadRef: PAYLOAD_REF
         });
         bytes memory sigA = _sign(UPSTREAM_PK, escrow.commitmentDigest(cA));
 
@@ -259,7 +263,8 @@ contract RecourseTest is Test {
             conditionId: cA.conditionId,
             merkleRoot: cA.merkleRoot,
             leafCount: cA.leafCount,
-            sourceId: cA.sourceId
+            sourceId: cA.sourceId,
+            payloadRef: cA.payloadRef
         });
         vm.expectRevert(RecourseEscrow.UnpermittedIssuer.selector);
         escrow.submitDeliveryCommitment(termsB, 0, forged, sigA);
@@ -410,7 +415,8 @@ contract RecourseTest is Test {
             conditionId: CONDITION_ID,
             merkleRoot: _rootOf(_actualLeaves()),
             leafCount: 0,
-            sourceId: SOURCE_ID
+            sourceId: SOURCE_ID,
+            payloadRef: PAYLOAD_REF
         });
         bytes memory sig = _sign(UPSTREAM_PK, escrow.commitmentDigest(c));
         vm.expectRevert(RecourseEscrow.ZeroLeafCount.selector);
@@ -432,7 +438,8 @@ contract RecourseTest is Test {
             conditionId: CONDITION_ID,
             merkleRoot: _rootOf(_actualLeaves()),
             leafCount: uint64(N),
-            sourceId: SOURCE_ID
+            sourceId: SOURCE_ID,
+            payloadRef: PAYLOAD_REF
         });
         vm.expectRevert(RecourseEscrow.ZeroAddressSignature.selector);
         escrow.submitDeliveryCommitment(terms, 0, c, garbage);
@@ -448,7 +455,8 @@ contract RecourseTest is Test {
             conditionId: CONDITION_ID,
             merkleRoot: _rootOf(_actualLeaves()),
             leafCount: uint64(N),
-            sourceId: SOURCE_ID
+            sourceId: SOURCE_ID,
+            payloadRef: PAYLOAD_REF
         });
         vm.expectRevert(RecourseEscrow.ZeroAddressSignature.selector);
         escrow.submitDeliveryCommitment(zeroTerms, 0, z, garbage);
@@ -504,6 +512,190 @@ contract RecourseTest is Test {
         EvidenceOffer[] memory offers = _offersFor(cs);
         vm.expectRevert(RecourseEscrow.DeadlineInPast.selector);
         escrow.openPurchase(terms, offers, _sign(BUYER_PK, specHash), _sign(SELLER_PK, specHash));
+    }
+
+    // ==================================================================
+    // Availability. Committing a root is not delivering a payload.
+    // ==================================================================
+
+    /// @notice The hole this closes: commit, send nothing, wait out the window,
+    ///         collect. Reclaim cannot help because the commitment left OPEN.
+    function testCommitWithoutDeliveryCannotRelease() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32 specHash = _open(terms);
+        _commit(terms, _rootOf(_actualLeaves()), UPSTREAM_PK);
+
+        // Reclaim is unavailable: the commitment already moved state out of OPEN.
+        vm.warp(uint256(deliveryDeadline) + 1);
+        vm.expectRevert(RecourseEscrow.WrongState.selector);
+        escrow.reclaim(terms);
+
+        // Rewind to inside the window and contest availability instead.
+        vm.warp(1_760_000_000 + 1);
+        vm.prank(buyer);
+        escrow.raiseAvailabilityChallenge(terms, 0, STALE_INDEX);
+        assertTrue(escrow.availabilityOf(specHash).open, "challenge open");
+
+        // The seller can no longer run out the clock into a release.
+        vm.warp(block.timestamp + WINDOW);
+        vm.expectRevert(RecourseEscrow.AvailabilityChallengeOpen.selector);
+        escrow.release(terms);
+
+        assertEq(usdc.balanceOf(seller), 0, "seller not paid");
+        assertEq(usdc.balanceOf(address(escrow)), AMOUNT, "funds still escrowed");
+    }
+
+    function testAvailabilityChallengeRefundsOnNoAnswer() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32 specHash = _open(terms);
+        _commit(terms, _rootOf(_actualLeaves()), UPSTREAM_PK);
+
+        vm.prank(buyer);
+        escrow.raiseAvailabilityChallenge(terms, 0, 5);
+
+        vm.expectRevert(RecourseEscrow.CurePeriodRunning.selector);
+        escrow.claimWithheld(terms);
+
+        vm.warp(block.timestamp + CURE);
+        escrow.claimWithheld(terms);
+
+        assertEq(usdc.balanceOf(buyer), 1_000_000_000, "buyer refunded in full");
+        assertEq(usdc.balanceOf(seller), 0, "seller paid nothing");
+        assertEq(uint8(escrow.purchaseOf(specHash).state), uint8(RecourseEscrow.State.REFUNDED));
+        assertFalse(escrow.availabilityOf(specHash).open, "challenge closed");
+    }
+
+    function testAvailabilityChallengeAnsweredResumesWindow() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32 specHash = _open(terms);
+        bytes32[] memory leaves = _actualLeaves();
+        _commit(terms, _rootOf(leaves), UPSTREAM_PK);
+
+        uint64 deliveredAt = escrow.purchaseOf(specHash).deliveredAt;
+
+        vm.warp(block.timestamp + 5);
+        vm.prank(buyer);
+        escrow.raiseAvailabilityChallenge(terms, 0, 1);
+
+        // A seller holding the payload opens the named leaf. Anyone may answer.
+        vm.warp(block.timestamp + 6);
+        escrow.answerAvailabilityChallenge(terms, 0, _opening(leaves, 1));
+
+        assertFalse(escrow.availabilityOf(specHash).open, "challenge cleared");
+        assertEq(
+            escrow.purchaseOf(specHash).deliveredAt,
+            deliveredAt + 6,
+            "clock resumes where it paused, frivolous challenge buys no time"
+        );
+
+        // The window runs on from where it stopped, then releases normally.
+        vm.expectRevert(RecourseEscrow.ChallengeWindowOpen.selector);
+        escrow.release(terms);
+        vm.warp(uint256(escrow.purchaseOf(specHash).deliveredAt) + WINDOW);
+        escrow.release(terms);
+        assertEq(usdc.balanceOf(seller), AMOUNT, "seller paid after answering");
+    }
+
+    /// @notice Answering hands the buyer the bytes a counterexample needs, so a
+    ///         seller sitting on bad records incriminates itself by curing.
+    function testAnsweringAStaleLeafArmsTheBuyer() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        _open(terms);
+        bytes32[] memory leaves = _actualLeaves();
+        _commit(terms, _rootOf(leaves), UPSTREAM_PK);
+
+        vm.prank(buyer);
+        escrow.raiseAvailabilityChallenge(terms, 0, STALE_INDEX);
+
+        vm.expectEmit(true, true, false, true, address(escrow));
+        emit RecourseEscrow.AvailabilityAnswered(
+            escrow.specHashOf(terms), CONDITION_ID, STALE_INDEX, recordBytes[STALE_INDEX], generatedAt[STALE_INDEX]
+        );
+        escrow.answerAvailabilityChallenge(terms, 0, _opening(leaves, STALE_INDEX));
+
+        // Those are exactly the bytes and the timestamp a breach proof carries.
+        escrow.submitBreachProof(terms, 0, _proofFor(terms, leaves, STALE_INDEX));
+        assertEq(usdc.balanceOf(buyer), 1_000_000_000, "refunded using the seller's own answer");
+    }
+
+    function testAvailabilityChallengeGuards() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32[] memory leaves = _actualLeaves();
+        _open(terms);
+
+        // Not while the purchase is merely OPEN.
+        vm.prank(buyer);
+        vm.expectRevert(RecourseEscrow.WrongState.selector);
+        escrow.raiseAvailabilityChallenge(terms, 0, 1);
+
+        _commit(terms, _rootOf(leaves), UPSTREAM_PK);
+
+        // Only the buyer may contest availability.
+        vm.prank(seller);
+        vm.expectRevert(RecourseEscrow.NotBuyer.selector);
+        escrow.raiseAvailabilityChallenge(terms, 0, 1);
+
+        // Not for a leaf outside the committed count.
+        vm.prank(buyer);
+        vm.expectRevert(RecourseEscrow.LeafIndexBeyondCommittedCount.selector);
+        escrow.raiseAvailabilityChallenge(terms, 0, N);
+
+        vm.prank(buyer);
+        escrow.raiseAvailabilityChallenge(terms, 0, 2);
+
+        // One at a time.
+        vm.prank(buyer);
+        vm.expectRevert(RecourseEscrow.AvailabilityChallengeOpen.selector);
+        escrow.raiseAvailabilityChallenge(terms, 0, 3);
+
+        // The answer must open the leaf that was actually named.
+        PayloadOpening memory wrong = _opening(leaves, 4);
+        vm.expectRevert(RecourseEscrow.OpeningIndexMismatch.selector);
+        escrow.answerAvailabilityChallenge(terms, 0, wrong);
+
+        // A fabricated opening does not verify against the committed root.
+        PayloadOpening memory forged = _opening(leaves, 2);
+        forged.recordBytes = bytes("not the committed record");
+        vm.expectRevert(RecourseEscrow.MerkleInclusionFailed.selector);
+        escrow.answerAvailabilityChallenge(terms, 0, forged);
+
+        // Answering after the cure period lapsed is too late.
+        vm.warp(block.timestamp + CURE);
+        PayloadOpening memory late = _opening(leaves, 2);
+        vm.expectRevert(RecourseEscrow.CurePeriodExpired.selector);
+        escrow.answerAvailabilityChallenge(terms, 0, late);
+    }
+
+    function testAvailabilityChallengesAreCapped() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32[] memory leaves = _actualLeaves();
+        _open(terms);
+        _commit(terms, _rootOf(leaves), UPSTREAM_PK);
+
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(buyer);
+            escrow.raiseAvailabilityChallenge(terms, 0, i);
+            escrow.answerAvailabilityChallenge(terms, 0, _opening(leaves, i));
+        }
+        vm.prank(buyer);
+        vm.expectRevert(RecourseEscrow.TooManyAvailabilityChallenges.selector);
+        escrow.raiseAvailabilityChallenge(terms, 0, 4);
+    }
+
+    function testRejectZeroPayloadRef() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32 specHash = _open(terms);
+        DeliveryCommitment memory c = DeliveryCommitment({
+            specHash: specHash,
+            conditionId: CONDITION_ID,
+            merkleRoot: _rootOf(_actualLeaves()),
+            leafCount: uint64(N),
+            sourceId: SOURCE_ID,
+            payloadRef: bytes32(0)
+        });
+        bytes memory sig = _sign(UPSTREAM_PK, escrow.commitmentDigest(c));
+        vm.expectRevert(RecourseEscrow.ZeroPayloadRef.selector);
+        escrow.submitDeliveryCommitment(terms, 0, c, sig);
     }
 
     // ==================================================================
@@ -706,7 +898,8 @@ contract RecourseTest is Test {
             asset: address(usdc),
             conditions: cs,
             challengeWindow: WINDOW,
-            deliveryDeadline: deliveryDeadline
+            deliveryDeadline: deliveryDeadline,
+            curePeriod: CURE
         });
     }
 
@@ -756,7 +949,8 @@ contract RecourseTest is Test {
             conditionId: terms.conditions[conditionIndex].conditionId,
             merkleRoot: root,
             leafCount: leafCount,
-            sourceId: SOURCE_ID
+            sourceId: SOURCE_ID,
+            payloadRef: PAYLOAD_REF
         });
         escrow.submitDeliveryCommitment(terms, conditionIndex, c, _sign(pk, escrow.commitmentDigest(c)));
     }
@@ -815,6 +1009,37 @@ contract RecourseTest is Test {
                 vm.load(address(escrow), bytes32(uint256(fromBase) + i))
             );
         }
+    }
+
+    /// @dev Rewrites the stored issuer without hard coding its slot offset, so
+    ///      reordering StoredCommitment cannot silently turn this into a no-op.
+    ///      Locates the word currently holding the known issuer, then asserts
+    ///      the rewrite through the public getter.
+    function _poisonIssuer(bytes32 specHash, uint8 conditionId, address to) internal {
+        address from = escrow.commitmentOf(specHash, conditionId).issuer;
+        bytes32 base = _commitmentSlot(specHash, conditionId);
+        bool found;
+        for (uint256 i = 0; i < 8; i++) {
+            bytes32 slot = bytes32(uint256(base) + i);
+            if (vm.load(address(escrow), slot) == bytes32(uint256(uint160(from)))) {
+                vm.store(address(escrow), slot, bytes32(uint256(uint160(to))));
+                found = true;
+                break;
+            }
+        }
+        assertTrue(found, "issuer slot not located");
+        assertEq(escrow.commitmentOf(specHash, conditionId).issuer, to, "poisoned");
+    }
+
+    function _opening(bytes32[] memory leaves, uint256 index) internal view returns (PayloadOpening memory) {
+        return PayloadOpening({
+            conditionId: CONDITION_ID,
+            index: index,
+            recordBytes: recordBytes[index],
+            generatedAt: generatedAt[index],
+            sourceId: SOURCE_ID,
+            merklePath: _pathFor(leaves, index)
+        });
     }
 
     function _commitmentSlot(bytes32 specHash, uint8 conditionId) internal pure returns (bytes32) {

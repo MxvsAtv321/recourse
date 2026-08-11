@@ -62,6 +62,22 @@ export function countViolations(records: DeliveredRecord[], condition: Condition
   return n;
 }
 
+/** The opening a challenged index requires. Same shape, minus the accusation. */
+export function buildOpening(
+  condition: Condition,
+  levels: Hex[][],
+  record: DeliveredRecord,
+): { conditionId: number; index: bigint; recordBytes: Hex; generatedAt: bigint; sourceId: Hex; merklePath: Hex[] } {
+  return {
+    conditionId: condition.conditionId,
+    index: BigInt(record.index),
+    recordBytes: record.bytes,
+    generatedAt: record.generatedAt,
+    sourceId: record.sourceId,
+    merklePath: pathFor(levels, record.index),
+  };
+}
+
 export function buildBreachProof(
   specHash: Hex,
   condition: Condition,

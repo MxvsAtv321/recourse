@@ -28,6 +28,7 @@ export const purchaseTermsTypes = {
     { name: "conditions", type: "Condition[]" },
     { name: "challengeWindow", type: "uint64" },
     { name: "deliveryDeadline", type: "uint64" },
+    { name: "curePeriod", type: "uint64" },
   ],
 } as const;
 
@@ -38,6 +39,7 @@ export const deliveryCommitmentTypes = {
     { name: "merkleRoot", type: "bytes32" },
     { name: "leafCount", type: "uint64" },
     { name: "sourceId", type: "bytes32" },
+    { name: "payloadRef", type: "bytes32" },
   ],
 } as const;
 
@@ -50,6 +52,7 @@ export const termsMessage = (t: PurchaseTerms) => ({
   conditions: t.conditions,
   challengeWindow: t.challengeWindow,
   deliveryDeadline: t.deliveryDeadline,
+  curePeriod: t.curePeriod,
 });
 
 export const commitmentMessage = (c: DeliveryCommitment) => ({
@@ -58,6 +61,7 @@ export const commitmentMessage = (c: DeliveryCommitment) => ({
   merkleRoot: c.merkleRoot,
   leafCount: c.leafCount,
   sourceId: c.sourceId,
+  payloadRef: c.payloadRef,
 });
 
 export type Signed<T> = { value: T; signature: Hex };
