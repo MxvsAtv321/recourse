@@ -26,7 +26,7 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Recourse — buyer protection for autonomous commerce",
   description:
-    "Payment becomes final only when machine-verifiable delivery terms are satisfied. One counterexample refunds the buyer.",
+    "Recourse makes objectively falsifiable delivery promises enforceable at settlement. One counterexample refunds the buyer.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

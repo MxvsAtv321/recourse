@@ -1,7 +1,7 @@
 # Recourse
 
-Buyer protection for autonomous commerce. Payment becomes final only when machine-verifiable
-delivery terms are satisfied.
+Buyer protection for autonomous commerce. Recourse makes objectively falsifiable delivery
+promises enforceable at settlement.
 
 Escrow that checks the goods before releasing the money. Settlement is optimistic: funds
 release after a challenge window unless someone submits a cryptographic proof that the
@@ -95,9 +95,15 @@ it or writes it to the deployment record.
 
 **Base Sepolia**, chain `84532`.
 
-| Contract | Address | Created in block |
-|---|---|---|
-| `RecourseEscrow` | [`0x8cac26Ac9cDd66479661035eDAFA898eAc0f8696`](https://sepolia.basescan.org/address/0x8cac26Ac9cDd66479661035eDAFA898eAc0f8696) | [45323814](https://sepolia.basescan.org/block/45323814) |
+| Contract | Address | Created in block | Built from |
+|---|---|---|---|
+| `RecourseEscrow` | [`0x8cac26Ac9cDd66479661035eDAFA898eAc0f8696`](https://sepolia.basescan.org/address/0x8cac26Ac9cDd66479661035eDAFA898eAc0f8696) | [45323814](https://sepolia.basescan.org/block/45323814) | commit `6e27a8d` |
+
+**This address is pinned to commit `6e27a8d` and does not track `HEAD`.** `HEAD` has since
+advanced by two `openPurchase` guards, which rejects an asset with no deployed code and a
+zero amount. Those 8 lines add 93 bytes of runtime bytecode, so the deployed contract does
+not contain them and a build of `HEAD` will not reproduce this address. Reproduce against
+`6e27a8d`.
 
 Source is not verified on Basescan. The bytecode check below is the stronger claim anyway,
 and anyone can reproduce it.
@@ -118,23 +124,35 @@ The two libraries are real and are exercised by the test suite. They are at
 `contracts/src/PredicateEvaluator.sol` and `contracts/src/MerkleBreachVerifier.sol`, and
 their code runs at the escrow address above.
 
-### The deployed bytecode is the same code the tests and demo run
+### The deployed bytecode is the code at commit 6e27a8d
 
-Verified rather than asserted. The runtime bytecode at the address above is 13,415 bytes.
-The local artifact from `forge build` over unmodified `contracts/src/` is the same length,
-and the two are byte-identical once the two immutable spans recorded in the artifact
-(offsets 847 and 10669, 32 bytes each) are masked. Those 64 bytes hold `_domainSeparator`,
-which is computed in the constructor from `address(this)` and therefore differs by
-deployment address by design. Nothing else differs.
+Verified rather than asserted. The runtime bytecode at the address above is 13,415 bytes
+(26,832 hex chars). A `forge build` of `contracts/src/` **at commit `6e27a8d`** produces the
+same length, and the two are byte-identical once the two immutable spans recorded in the
+artifact (offsets 847 and 10669, 32 bytes each) are masked. Those 64 bytes hold
+`_domainSeparator`, computed in the constructor from `address(this)` and therefore different
+per deployment address by design. Nothing else differs.
 
-To reproduce:
+A build of `HEAD` produces 27,018 hex chars and does not match, by exactly the 93 bytes the
+two `openPurchase` guards add. That is expected, not a discrepancy.
+
+To reproduce, check out the pinned commit first. A worktree keeps your working tree intact:
 
 ```bash
-forge build
-cast code 0x8cac26Ac9cDd66479661035eDAFA898eAc0f8696 --rpc-url https://sepolia.base.org
-# compare against out/RecourseEscrow.sol/RecourseEscrow.json -> deployedBytecode.object,
-# masking deployedBytecode.immutableReferences
+git worktree add --detach /tmp/recourse-6e27a8d 6e27a8d
+cd /tmp/recourse-6e27a8d && forge build
+
+node scripts/assert-runtime-bytecode.mjs \
+  0x8cac26Ac9cDd66479661035eDAFA898eAc0f8696 \
+  /tmp/recourse-6e27a8d/out/RecourseEscrow.sol/RecourseEscrow.json \
+  https://sepolia.base.org
+
+git worktree remove /tmp/recourse-6e27a8d
 ```
+
+`scripts/assert-runtime-bytecode.mjs` does the masking and exits non-zero on any mismatch.
+Run it from the repo root; it works against any checkout, so pass the artifact path from the
+worktree as above.
 
 ### The recorded demo runs on local anvil, deliberately
 
@@ -144,8 +162,13 @@ through challenge windows and cure periods with `evm_increaseTime`, deploys fres
 every run so addresses and transaction hashes are reproducible, and finishes in seconds
 instead of waiting on public block times.
 
-The code is the same. Both come from `forge build` over the same unmodified sources, and the
-bytecode check above is what establishes that. Nothing is stubbed, mocked or compiled
-differently for the demo. The escrow at this address accepts the identical calls the demo
-makes.
+The code is the same at the pinned commit. Both come from `forge build` over the same
+unmodified sources at `6e27a8d`, and the bytecode check above is what establishes that.
+Nothing is stubbed, mocked or compiled differently for the demo. The escrow at this address
+accepts the identical calls the demo made at that commit.
+
+The demo you run today executes against `HEAD`, which carries the two extra guards. Those
+guards only reject purchases the deployed contract would have accepted and then failed to
+fund, so no scenario behaves differently. If you need the deployed address and the demo to
+be bytecode identical again, redeploy from `HEAD`.
 <!-- deployed:end -->

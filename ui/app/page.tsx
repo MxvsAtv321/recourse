@@ -1,5 +1,5 @@
 import { Verification } from "./components/Verification";
-import { duration, money, pct, shortHash, stamp } from "../lib/format";
+import { compactAddresses, duration, money, pct, shortHash, stamp } from "../lib/format";
 import { loadRun } from "../lib/run";
 
 export const dynamic = "force-dynamic";
@@ -43,14 +43,15 @@ export default function Page() {
           </div>
           <span className="livechip">
             <span className="pulse" />
-            Live run · chain {meta.chainId} · block {meta.blockNumber}
+            Live run · {meta.chainId === 31337 ? "local anvil" : `chain ${meta.chainId}`} · block{" "}
+            {meta.blockNumber}
           </span>
         </div>
       </header>
 
       <section className="shell hero">
         <h1>
-          Payment becomes final only when the delivery <em>keeps its promise</em>.
+          Payment becomes final only if nobody can prove the delivery <em>broke its promise</em>.
         </h1>
         <p className="lede">
           An agent buys a data feed. The file is new, signed and correctly shaped, and every check an agent runs today
@@ -103,7 +104,7 @@ export default function Page() {
                 <div className="check" key={c.name}>
                   <Tick ok={c.passed} />
                   <span className="check-name">{c.name}</span>
-                  <span className="check-detail">{c.detail}</span>
+                  <span className="check-detail">{compactAddresses(c.detail)}</span>
                 </div>
               ))}
             </div>
@@ -143,7 +144,7 @@ export default function Page() {
           <div className="reveal-panel">
             <div className="card-head">
               <span className="card-title">Per-record generation time</span>
-              <span className="card-title">nobody checked this</span>
+              <span className="card-note">nobody checked this</span>
             </div>
             {unprotected.reveal.samples.map((s) => (
               <div className={`stamp ${s.stale ? "stale" : "fresh"}`} key={s.index}>
@@ -268,7 +269,7 @@ export default function Page() {
               taken.
             </p>
           </div>
-          <details className="disclose">
+          <details className="disclose" open>
             <summary>
               <span className="chev" aria-hidden />
               Compare what was offered against what was required

@@ -1,7 +1,7 @@
 # Recourse
 
-Buyer protection for autonomous commerce. Payment becomes final only when machine-verifiable
-delivery terms are satisfied.
+Buyer protection for autonomous commerce. Recourse makes objectively falsifiable delivery
+promises enforceable at settlement.
 
 NTU InnovateX 2026, Track 1. Stage 1 due 14 Aug, submit 10:00 EDT.
 

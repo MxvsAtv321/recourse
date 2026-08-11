@@ -33,3 +33,7 @@ export function duration(seconds: string): string {
 }
 
 export const pct = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
+
+/** Shortens any full 0x address inside free text so a row stays on one line. */
+export const compactAddresses = (s: string): string =>
+  s.replace(/0x[0-9a-fA-F]{40}/g, (m) => `${m.slice(0, 6)}\u2026${m.slice(-4)}`);
