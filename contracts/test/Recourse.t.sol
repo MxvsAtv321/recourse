@@ -699,6 +699,144 @@ contract RecourseTest is Test {
     }
 
     // ==================================================================
+    // Deadline boundaries at t-1. Every other timing assertion sits at offset 0
+    // or at exactly t, so an off-by-one shifting a boundary one second in the
+    // permissive direction would pass the whole suite unnoticed.
+    // ==================================================================
+
+    function testReleaseRevertsOneSecondBeforeWindow() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32 specHash = _open(terms);
+        _commit(terms, _rootOf(_compliantLeaves()), UPSTREAM_PK);
+        uint256 deliveredAt = escrow.purchaseOf(specHash).deliveredAt;
+
+        vm.warp(deliveredAt + WINDOW - 1);
+        vm.expectRevert(RecourseEscrow.ChallengeWindowOpen.selector);
+        escrow.release(terms);
+
+        // One second later it goes through, so the boundary is where it claims
+        // to be rather than merely somewhere earlier.
+        vm.warp(deliveredAt + WINDOW);
+        escrow.release(terms);
+        assertEq(usdc.balanceOf(seller), AMOUNT, "released at exactly t, not before");
+    }
+
+    function testBreachProofSucceedsOneSecondBeforeWindow() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32 specHash = _open(terms);
+        bytes32[] memory leaves = _actualLeaves();
+        _commit(terms, _rootOf(leaves), UPSTREAM_PK);
+        uint256 deliveredAt = escrow.purchaseOf(specHash).deliveredAt;
+
+        BreachProof memory proof = _proofFor(terms, leaves, STALE_INDEX);
+        vm.warp(deliveredAt + WINDOW - 1);
+        escrow.submitBreachProof(terms, 0, proof);
+
+        assertEq(usdc.balanceOf(buyer), 1_000_000_000, "a last second counterexample still lands");
+        assertEq(uint8(escrow.purchaseOf(specHash).state), uint8(RecourseEscrow.State.REFUNDED));
+    }
+
+    function testRaiseAvailabilityChallengeSucceedsOneSecondBeforeWindow() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32 specHash = _open(terms);
+        bytes32[] memory leaves = _actualLeaves();
+        _commit(terms, _rootOf(leaves), UPSTREAM_PK);
+        uint256 deliveredAt = escrow.purchaseOf(specHash).deliveredAt;
+
+        vm.warp(deliveredAt + WINDOW - 1);
+        vm.prank(buyer);
+        escrow.raiseAvailabilityChallenge(terms, 0, 1);
+        assertTrue(escrow.availabilityOf(specHash).open, "contestable up to the last second");
+
+        // Answering at the same instant leaves deliveredAt unmoved, so the window
+        // still ends where it did.
+        escrow.answerAvailabilityChallenge(terms, 0, _opening(leaves, 1));
+        assertEq(escrow.purchaseOf(specHash).deliveredAt, deliveredAt, "no time bought");
+
+        vm.warp(deliveredAt + WINDOW);
+        vm.prank(buyer);
+        vm.expectRevert(RecourseEscrow.ChallengeWindowClosed.selector);
+        escrow.raiseAvailabilityChallenge(terms, 0, 2);
+    }
+
+    function testReclaimRevertsOneSecondBeforeDeadline() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        _open(terms);
+
+        vm.warp(uint256(deliveryDeadline) - 1);
+        vm.expectRevert(RecourseEscrow.DeliveryDeadlineNotReached.selector);
+        escrow.reclaim(terms);
+
+        vm.warp(uint256(deliveryDeadline));
+        escrow.reclaim(terms);
+        assertEq(usdc.balanceOf(buyer), 1_000_000_000, "reclaimable at exactly t, not before");
+    }
+
+    function testClaimWithheldRevertsOneSecondBeforeCure() public {
+        PurchaseTerms memory terms = _terms(bytes32(uint256(1)));
+        bytes32 specHash = _open(terms);
+        bytes32[] memory leaves = _actualLeaves();
+        _commit(terms, _rootOf(leaves), UPSTREAM_PK);
+
+        vm.prank(buyer);
+        escrow.raiseAvailabilityChallenge(terms, 0, 1);
+        uint256 raisedAt = escrow.availabilityOf(specHash).raisedAt;
+
+        vm.warp(raisedAt + CURE - 1);
+        vm.expectRevert(RecourseEscrow.CurePeriodRunning.selector);
+        escrow.claimWithheld(terms);
+
+        // The other side of the same boundary: the seller can still cure at that
+        // exact instant, so the two comparisons meet with no gap and no overlap.
+        escrow.answerAvailabilityChallenge(terms, 0, _opening(leaves, 1));
+        assertFalse(escrow.availabilityOf(specHash).open, "cured on the last second");
+    }
+
+    // ==================================================================
+    // A purchase must not record itself as funded having moved nothing.
+    // ==================================================================
+
+    function testRejectAssetWithNoCode() public {
+        Condition[] memory cs = new Condition[](1);
+        cs[0] = _freshness(CONDITION_ID, upstream);
+        EvidenceOffer[] memory offers = _offersFor(cs);
+
+        // An EOA. asset.call returns ok with empty returndata, which the
+        // no-return-value branch in _pull would otherwise accept.
+        PurchaseTerms memory eoa = _termsWith(bytes32(uint256(1)), cs);
+        eoa.asset = address(0xA11CE);
+        bytes32 eoaSpec = escrow.specHashOf(eoa);
+        vm.expectRevert(RecourseEscrow.AssetNotAContract.selector);
+        escrow.openPurchase(eoa, offers, _sign(BUYER_PK, eoaSpec), _sign(SELLER_PK, eoaSpec));
+
+        PurchaseTerms memory zero = _termsWith(bytes32(uint256(2)), cs);
+        zero.asset = address(0);
+        bytes32 zeroSpec = escrow.specHashOf(zero);
+        vm.expectRevert(RecourseEscrow.AssetNotAContract.selector);
+        escrow.openPurchase(zero, offers, _sign(BUYER_PK, zeroSpec), _sign(SELLER_PK, zeroSpec));
+
+        assertEq(uint8(escrow.purchaseOf(eoaSpec).state), uint8(RecourseEscrow.State.NONE));
+        assertEq(uint8(escrow.purchaseOf(zeroSpec).state), uint8(RecourseEscrow.State.NONE));
+
+        // A real token still opens, so the guard rejects the right thing.
+        _open(_terms(bytes32(uint256(3))));
+        assertEq(usdc.balanceOf(address(escrow)), AMOUNT);
+    }
+
+    function testRejectZeroAmount() public {
+        Condition[] memory cs = new Condition[](1);
+        cs[0] = _freshness(CONDITION_ID, upstream);
+        PurchaseTerms memory terms = _termsWith(bytes32(uint256(1)), cs);
+        terms.amount = 0;
+        bytes32 specHash = escrow.specHashOf(terms);
+        EvidenceOffer[] memory offers = _offersFor(cs);
+
+        vm.expectRevert(RecourseEscrow.ZeroAmount.selector);
+        escrow.openPurchase(terms, offers, _sign(BUYER_PK, specHash), _sign(SELLER_PK, specHash));
+        assertEq(uint8(escrow.purchaseOf(specHash).state), uint8(RecourseEscrow.State.NONE));
+    }
+
+    // ==================================================================
     // Supporting tests
     // ==================================================================
 

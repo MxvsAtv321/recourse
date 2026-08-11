@@ -230,6 +230,8 @@ contract RecourseEscrow {
     error UnsettleableUniversalCondition();
     error ZeroAddressSignature();
     error ZeroPayloadRef();
+    error ZeroAmount();
+    error AssetNotAContract();
     error ZeroCurePeriod();
     error NotBuyer();
     error AvailabilityChallengeOpen();
@@ -342,6 +344,12 @@ contract RecourseEscrow {
 
         if (terms.deliveryDeadline <= block.timestamp) revert DeadlineInPast();
         if (terms.curePeriod == 0) revert ZeroCurePeriod();
+        if (terms.amount == 0) revert ZeroAmount();
+        // A call to an address with no code returns success with empty returndata,
+        // and empty returndata is exactly what the no-return-value branch in _pull
+        // accepts. Without this the escrow would record itself as funded having
+        // moved nothing.
+        if (terms.asset.code.length == 0) revert AssetNotAContract();
 
         // Each conditionId keys one commitment slot. Duplicates would collide, the
         // second commitment would revert, and the purchase could never reach
