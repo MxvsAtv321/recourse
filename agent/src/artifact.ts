@@ -15,7 +15,7 @@ export type ConditionView = {
   quantifier: "UNIVERSAL" | "SCALAR";
   opcode: string;
   threshold: string;
-  thresholdKind: "timestamp" | "count";
+  thresholdKind: ThresholdKind;
   permittedIssuer: string;
   expectedSourceId: string;
   settlement: string;
@@ -138,3 +138,27 @@ export type RunArtifact = {
     earlyReclaimError: string;
   };
 };
+
+export type ThresholdKind = "timestamp" | "count" | "hash";
+
+/**
+ * How the threshold bytes should be read.
+ *
+ * Derived from the opcode, because the opcode is what decides how the value is
+ * compared and therefore what it is. Deriving it from the quantifier was wrong:
+ * a SCHEMA_HASH condition is UNIVERSAL but its threshold is a digest, not a
+ * time, and labelling it "timestamp" made the UI render a keccak hash as a date.
+ */
+export function thresholdKindFor(opcode: string): ThresholdKind {
+  switch (opcode) {
+    case "TIMESTAMP_GTE":
+      return "timestamp";
+    case "UINT_GTE":
+    case "UINT_EQ":
+      return "count";
+    case "BYTES32_EQ":
+      return "hash";
+    default:
+      throw new Error(`no threshold kind for opcode ${opcode}`);
+  }
+}

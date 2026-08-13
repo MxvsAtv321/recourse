@@ -4,6 +4,9 @@ import { loadRun } from "../lib/run";
 
 export const dynamic = "force-dynamic";
 
+/** A bytes32 threshold is stored as a decimal string; show it as the digest it is. */
+const thresholdHash = (decimal: string) => shortHash(`0x${BigInt(decimal).toString(16).padStart(64, "0")}`, 10, 6);
+
 function Tick({ ok }: { ok: boolean }) {
   return (
     <span className={ok ? "tick" : "tick bad"} aria-hidden>
@@ -221,7 +224,9 @@ export default function Page() {
                   <dd>
                     {c.thresholdKind === "timestamp"
                       ? stamp(c.threshold)
-                      : `${Number(c.threshold).toLocaleString("en-US")} leaves claimed`}
+                      : c.thresholdKind === "hash"
+                        ? thresholdHash(c.threshold)
+                        : `${Number(c.threshold).toLocaleString("en-US")} leaves claimed`}
                   </dd>
                 </div>
                 <div>

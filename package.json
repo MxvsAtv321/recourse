@@ -7,6 +7,7 @@
     "start": "npm --prefix ui run start",
     "capture": "agent/node_modules/.bin/tsx agent/src/demo/capture.ts",
     "demo": "bash scripts/demo.sh",
-    "test": "$HOME/.foundry/bin/forge test -vv"
+    "test": "$HOME/.foundry/bin/forge test -vv",
+    "check:conditions": "agent/node_modules/.bin/tsx agent/src/demo/check-condition-views.ts"
   }
 }

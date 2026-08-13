@@ -63,6 +63,7 @@ const USDC_ABI = usdcArtifact().abi as Abi;
 
 export type { Check, ConditionView, RunArtifact } from "./artifact.js";
 import type { ConditionView, RunArtifact } from "./artifact.js";
+import { viewOf } from "./conditionView.js";
 
 // ------------------------------------------------------------------ helpers
 
@@ -176,24 +177,6 @@ async function commitAll(
     hashes.push(receipt.transactionHash);
   }
   return hashes;
-}
-
-function viewOf(c: Condition, ruleId: string): ConditionView {
-  const universal = c.quantifier === Quantifier.UNIVERSAL;
-  return {
-    conditionId: c.conditionId,
-    sourceQuote: c.sourceQuote,
-    ruleId,
-    claimType: claimTypeName(c.requires),
-    quantifier: universal ? "UNIVERSAL" : "SCALAR",
-    opcode: opcodeName(c.opcode),
-    threshold: BigInt(c.threshold).toString(),
-    thresholdKind: universal ? "timestamp" : "count",
-    permittedIssuer: c.permittedIssuer,
-    expectedSourceId: c.expectedSourceId,
-    settlement: universal ? "one counterexample" : "direct evaluation at release",
-    protectedByRule: true,
-  };
 }
 
 // ------------------------------------------------------------------ the run
