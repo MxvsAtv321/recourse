@@ -18,7 +18,7 @@ type CapturedSettlement = {
   escrowBalanceAfter: string;
 };
 
-type Phase = "idle" | "running" | "live" | "captured";
+type Phase = "probing" | "idle" | "running" | "live" | "captured";
 
 export function Verification({
   steps,
@@ -33,11 +33,38 @@ export function Verification({
   symbol: string;
   amount: string;
 }) {
-  const [phase, setPhase] = useState<Phase>("idle");
+  const [phase, setPhase] = useState<Phase>("probing");
   const [trace, setTrace] = useState<DemoTrace | null>(null);
   const [visible, setVisible] = useState(0);
   const [note, setNote] = useState<string>("");
   const started = useRef(false);
+
+  // Ask whether live execution is possible before offering it. On a hosted
+  // deployment there is no local chain and the scenario source is not shipped,
+  // so the button would be a control that is guaranteed to fail.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/demo/breach", { method: "GET", cache: "no-store" });
+        const probe = (await res.json()) as { available?: boolean; reasons?: string[] };
+        if (cancelled) return;
+        if (probe.available) {
+          setPhase("idle");
+        } else {
+          setNote((probe.reasons ?? []).join("; ") || "live execution unavailable");
+          setPhase("captured");
+        }
+      } catch {
+        if (cancelled) return;
+        setNote("live execution unavailable");
+        setPhase("captured");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Reveal one event at a time. Order is structural: we only ever increment,
   // so an event can never appear before the one that precedes it.
@@ -70,13 +97,15 @@ export function Verification({
   const last = shown[shown.length - 1];
   const refundEvent = shown.find((e) => e.kind === "REFUND_MINED");
 
-  if (phase === "idle" || phase === "running") {
+  if (phase === "probing" || phase === "idle" || phase === "running") {
     return (
       <div className="split" style={{ alignItems: "start" }} data-phase={phase} data-trace-source="none">
         <div className="card pay">
           <div className="card-head">
             <span className="card-title">Settlement</span>
-            <span className="badge plain">{phase === "running" ? "Executing" : "Ready"}</span>
+            <span className="badge plain">
+              {phase === "probing" ? "Checking" : phase === "running" ? "Executing" : "Ready"}
+            </span>
           </div>
           <div className="pay-body">
             <div>
@@ -88,17 +117,29 @@ export function Verification({
                 Runs the breach scenario against the local chain and settles it for real.
               </p>
             </div>
-            <button className="btn" type="button" onClick={run} disabled={phase === "running"} data-testid="protect-and-pay">
+            <button
+              className="btn"
+              type="button"
+              onClick={run}
+              disabled={phase !== "idle"}
+              data-testid="protect-and-pay"
+            >
               <svg className="lock" viewBox="0 0 16 16" aria-hidden>
                 <rect x="3" y="7" width="10" height="7" rx="1.6" />
                 <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" strokeLinecap="round" />
               </svg>
-              {phase === "running" ? "Executing on chain…" : `Protect & Pay · ${money(amount, decimals)} ${symbol}`}
+              {phase === "probing"
+                ? "Checking for a local chain…"
+                : phase === "running"
+                  ? "Executing on chain…"
+                  : `Protect & Pay · ${money(amount, decimals)} ${symbol}`}
             </button>
             <p className="pay-note">
-              {phase === "running"
-                ? "Deploying, funding, committing, proving and settling."
-                : "One purchase, one counterexample, one refund."}
+              {phase === "probing"
+                ? "Live execution needs a local chain."
+                : phase === "running"
+                  ? "Deploying, funding, committing, proving and settling."
+                  : "One purchase, one counterexample, one refund."}
             </p>
           </div>
         </div>
@@ -130,7 +171,8 @@ export function Verification({
           {note ? (
             <div className="card-pad" style={{ borderTop: "1px solid var(--line)" }}>
               <p style={{ fontSize: "0.86rem", color: "var(--ink-3)" }}>
-                Live execution was unavailable, so this is the verified run captured earlier. Reason: {note}.
+                This deployment cannot run the scenario live, so it shows the verified run captured earlier against
+                a local chain. Reason: {note}.
               </p>
             </div>
           ) : null}

@@ -58,6 +58,51 @@ function runScenario(root: string): Promise<DemoTrace> {
   });
 }
 
+/**
+ * Can this deployment run the scenario at all? Answered without executing it.
+ *
+ * On a hosted deployment neither condition holds: agent/node_modules is
+ * gitignored so tsx is absent, and there is no local chain. The page asks this
+ * on mount so it never offers a control that is guaranteed to fail.
+ */
+export async function GET() {
+  const reasons: string[] = [];
+  let root: string | null = null;
+  try {
+    root = repoRoot();
+  } catch {
+    reasons.push("scenario source is not part of this deployment");
+  }
+  if (root && !existsSync(join(root, "agent", "node_modules", ".bin", "tsx"))) {
+    reasons.push("agent dependencies are not installed here");
+  }
+
+  const rpc = process.env.RECOURSE_RPC ?? "http://127.0.0.1:8545";
+  let chainId: number | null = null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 1500);
+    const res = await fetch(rpc, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+    clearTimeout(timer);
+    const j = (await res.json()) as { result?: string };
+    if (!j.result) throw new Error("no chain id");
+    chainId = Number.parseInt(j.result, 16);
+  } catch {
+    reasons.push("no local chain is reachable");
+  }
+
+  return Response.json(
+    { available: reasons.length === 0, reasons, chainId, rpc },
+    { headers: { "cache-control": "no-store" } },
+  );
+}
+
 export async function POST() {
   try {
     const trace = await runScenario(repoRoot());
