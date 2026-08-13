@@ -18,7 +18,7 @@ type CapturedSettlement = {
   escrowBalanceAfter: string;
 };
 
-type Phase = "probing" | "idle" | "running" | "live" | "captured";
+type Phase = "idle" | "running" | "live" | "captured";
 
 export function Verification({
   steps,
@@ -33,7 +33,10 @@ export function Verification({
   symbol: string;
   amount: string;
 }) {
-  const [phase, setPhase] = useState<Phase>("probing");
+  // Server-rendered as "captured": it holds on any deployment, so the HTML never
+  // contains a control that cannot work. The client upgrades to the live button
+  // only once the probe says a chain is actually reachable.
+  const [phase, setPhase] = useState<Phase>("captured");
   const [trace, setTrace] = useState<DemoTrace | null>(null);
   const [visible, setVisible] = useState(0);
   const [note, setNote] = useState<string>("");
@@ -97,15 +100,13 @@ export function Verification({
   const last = shown[shown.length - 1];
   const refundEvent = shown.find((e) => e.kind === "REFUND_MINED");
 
-  if (phase === "probing" || phase === "idle" || phase === "running") {
+  if (phase === "idle" || phase === "running") {
     return (
       <div className="split" style={{ alignItems: "start" }} data-phase={phase} data-trace-source="none">
         <div className="card pay">
           <div className="card-head">
             <span className="card-title">Settlement</span>
-            <span className="badge plain">
-              {phase === "probing" ? "Checking" : phase === "running" ? "Executing" : "Ready"}
-            </span>
+            <span className="badge plain">{phase === "running" ? "Executing" : "Ready"}</span>
           </div>
           <div className="pay-body">
             <div>
@@ -128,18 +129,12 @@ export function Verification({
                 <rect x="3" y="7" width="10" height="7" rx="1.6" />
                 <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" strokeLinecap="round" />
               </svg>
-              {phase === "probing"
-                ? "Checking for a local chain…"
-                : phase === "running"
-                  ? "Executing on chain…"
-                  : `Protect & Pay · ${money(amount, decimals)} ${symbol}`}
+              {phase === "running" ? "Executing on chain…" : `Protect & Pay · ${money(amount, decimals)} ${symbol}`}
             </button>
             <p className="pay-note">
-              {phase === "probing"
-                ? "Live execution needs a local chain."
-                : phase === "running"
-                  ? "Deploying, funding, committing, proving and settling."
-                  : "One purchase, one counterexample, one refund."}
+              {phase === "running"
+                ? "Deploying, funding, committing, proving and settling."
+                : "One purchase, one counterexample, one refund."}
             </p>
           </div>
         </div>
