@@ -241,6 +241,50 @@ export async function runAll(): Promise<RunArtifact> {
   };
 }
 
+/**
+ * The BREACH_PROVED scenario on its own, against the already running local anvil.
+ *
+ * This performs the same setup runAll() does and then calls the very same
+ * runProtected(). The scenario is not duplicated here: if the scenario changes,
+ * this changes with it. Fresh contracts per invocation, so repeated calls do not
+ * collide on a specHash that has already been opened.
+ */
+export async function runBreachScenario(): Promise<{
+  meta: RunArtifact["meta"];
+  protectedPurchase: RunArtifact["protectedPurchase"];
+}> {
+  chainId = await publicClient.getChainId();
+  usdc = await deploy("MockUSDC");
+  escrow = await deploy("RecourseEscrow");
+
+  await send(usdc, USDC_ABI, "mint", [accounts.buyer.address, 10_000_000_000n], accounts.deployer);
+  await send(usdc, USDC_ABI, "approve", [escrow, 2n ** 256n - 1n], accounts.buyer);
+
+  const protectedPurchase = await runProtected();
+
+  const block = await publicClient.getBlock();
+  return {
+    meta: {
+      chainId,
+      rpc: publicClient.transport.url as string,
+      capturedAt: new Date().toISOString(),
+      chainTime: block.timestamp.toString(),
+      blockNumber: block.number.toString(),
+      escrow,
+      usdc,
+      accounts: {
+        buyer: accounts.buyer.address,
+        seller: accounts.seller.address,
+        upstream: accounts.upstream.address,
+        timestampAuthority: accounts.timestampAuthority.address,
+      },
+      assetSymbol: "USDC",
+      assetDecimals: 6,
+    },
+    protectedPurchase,
+  };
+}
+
 async function runUnprotected(): Promise<RunArtifact["unprotected"]> {
   const now = await chainNow();
   const records = buildDelivery(RECORD_COUNT, now, MIXED_AGES);

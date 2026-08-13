@@ -371,7 +371,13 @@ export default function Page() {
           </p>
         </div>
 
-        <Verification steps={prot.verification} settlement={prot.settlement} decimals={dec} symbol={sym} />
+        <Verification
+          steps={prot.verification}
+          settlement={prot.settlement}
+          decimals={dec}
+          symbol={sym}
+          amount={prot.amount}
+        />
       </section>
 
       {/* ---------------------------------------------------------------- 6 */}

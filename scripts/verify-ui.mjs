@@ -125,14 +125,11 @@ check("button label with amount", `Protect & Pay ${usd(p.amount)} ${run.meta.ass
 check("challenge window", "30s");
 check("escrow address", run.meta.escrow);
 
-console.log("\nVIEW 5  verification revealing checks in sequence, ending in the refund state");
-for (const s of p.verification) check(`step ${s.step}`, s.label);
-check("verdict", "BREACH PROVED");
-check("refund amount", `${(Number(p.settlement.refundAmount) / 1e6).toFixed(2)}`);
-check("offending index", `index ${p.settlement.offendingIndex}`);
-check("refund tx hash", p.settlement.txHash);
-await onChain("breach proof tx", p.settlement.txHash);
-check("full-width refund panel", 'class="refund"');
+console.log("\nVIEW 5  settlement now starts idle and executes live on click");
+check("idle Protect & Pay control", "Protect &amp; Pay · 100.00 USDC");
+check("no trace rendered before the click", 'data-trace-source="none"');
+refute("no verdict panel before the click", 'data-testid="refund-panel"');
+console.log("   note  the live and captured paths are verified by the browser walkthrough, not here");
 
 console.log("\nVIEW 6  unprotectable state naming the term");
 check("the term", run.unprotectable.phrase);
