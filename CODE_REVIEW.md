@@ -7,7 +7,7 @@ Date: 2026-08-13
 
 ## TL;DR
 
-Impressively well-designed hackathon project. The cryptographic design is sound, the implementation matches the spec precisely, and the test suite is genuinely sophisticated. The issues below are real but mostly minor.
+The cryptographic design is sound, the implementation matches the spec precisely, and the test suite is genuinely sophisticated. The issues below are real but mostly minor.
 
 ---
 
