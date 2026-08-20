@@ -100,9 +100,11 @@ it or writes it to the deployment record.
 | `RecourseEscrow` | [`0x8cac26Ac9cDd66479661035eDAFA898eAc0f8696`](https://sepolia.basescan.org/address/0x8cac26Ac9cDd66479661035eDAFA898eAc0f8696) | [45323814](https://sepolia.basescan.org/block/45323814) | commit `6e27a8d` |
 
 **This address is pinned to commit `6e27a8d` and does not track `HEAD`.** `HEAD` has since
-advanced by two `openPurchase` guards, which rejects an asset with no deployed code and a
-zero amount. Those 8 lines add 93 bytes of runtime bytecode, so the deployed contract does
-not contain them and a build of `HEAD` will not reproduce this address. Reproduce against
+moved in two directions. Two `openPurchase` guards were added, rejecting an asset with no
+deployed code and a zero amount, worth 93 bytes of runtime bytecode. The `SCHEMA_HASH` branch
+was then cut from `_establishedByBoundLeaves` and `_observed`, giving 45 bytes back. `HEAD` is
+therefore 48 bytes larger than the deployed contract rather than 93, and it differs by more
+than the guards, so a build of `HEAD` will not reproduce this address. Reproduce against
 `6e27a8d`.
 
 Source is not verified on Basescan. The bytecode check below is the stronger claim anyway,
@@ -133,8 +135,9 @@ artifact (offsets 847 and 10669, 32 bytes each) are masked. Those 64 bytes hold
 `_domainSeparator`, computed in the constructor from `address(this)` and therefore different
 per deployment address by design. Nothing else differs.
 
-A build of `HEAD` produces 27,018 hex chars and does not match, by exactly the 93 bytes the
-two `openPurchase` guards add. That is expected, not a discrepancy.
+A build of `HEAD` produces 26,928 hex chars, 13,463 bytes, and does not match. The 48 byte
+difference is the two `openPurchase` guards adding 93 bytes and the removal of the
+`SCHEMA_HASH` branch taking 45 back. That is expected, not a discrepancy.
 
 To reproduce, check out the pinned commit first. A worktree keeps your working tree intact:
 
@@ -167,8 +170,9 @@ unmodified sources at `6e27a8d`, and the bytecode check above is what establishe
 Nothing is stubbed, mocked or compiled differently for the demo. The escrow at this address
 accepts the identical calls the demo made at that commit.
 
-The demo you run today executes against `HEAD`, which carries the two extra guards. Those
-guards only reject purchases the deployed contract would have accepted and then failed to
-fund, so no scenario behaves differently. If you need the deployed address and the demo to
-be bytecode identical again, redeploy from `HEAD`.
+The demo you run today executes against `HEAD`, which carries the two extra guards and no
+longer accepts a `SCHEMA_HASH` condition. The guards only reject purchases the deployed
+contract would have accepted and then failed to fund, and no scenario ever compiled a schema
+condition, so no scenario behaves differently. If you need the deployed address and the demo
+to be bytecode identical again, redeploy from `HEAD`.
 <!-- deployed:end -->
