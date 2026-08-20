@@ -19,8 +19,8 @@ export function viewOf(c: Condition, ruleId: string): ConditionView {
     quantifier: universal ? "UNIVERSAL" : "SCALAR",
     opcode: opcodeName(c.opcode),
     threshold: BigInt(c.threshold).toString(),
-    // Derived from the opcode, never the quantifier: a SCHEMA_HASH condition is
-    // UNIVERSAL but its threshold is a digest, not a time.
+    // Derived from the opcode, never the quantifier. Deriving it from the
+    // quantifier printed a digest threshold as a date.
     thresholdKind: thresholdKindFor(opcodeName(c.opcode)),
     permittedIssuer: c.permittedIssuer,
     expectedSourceId: c.expectedSourceId,

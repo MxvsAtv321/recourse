@@ -17,12 +17,18 @@ export function satisfied(opcode: number, observed: Hex, threshold: Hex): boolea
   }
 }
 
+/**
+ * Mirrors RecourseEscrow._observed. Generation time is the only per-record
+ * property a bound leaf establishes. SCHEMA_HASH was cut from both sides: the
+ * leaf holds keccak256(recordBytes), the digest of one record, while a schema
+ * threshold is the digest of a shape, so every conforming record compared
+ * unequal and counted as a counterexample.
+ */
 function observedFor(condition: Condition, record: DeliveredRecord): Hex {
   if (condition.requires === ClaimType.RECORD_GENERATION_TIME) {
     return `0x${record.generatedAt.toString(16).padStart(64, "0")}`;
   }
-  if (condition.requires === ClaimType.SCHEMA_HASH) return keccak256(record.bytes);
-  throw new Error("claim is not a per-record property");
+  throw new Error("claim is not established by bound leaves");
 }
 
 export type Violation = { record: DeliveredRecord; observed: Hex };

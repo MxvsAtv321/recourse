@@ -690,19 +690,27 @@ contract RecourseEscrow {
         return bytes32(uint256(sc.leafCount));
     }
 
-    /// @dev The leaf commits to exactly two observable per-record properties:
-    ///      the content hash and the generation time. Those are the only claims a
-    ///      signed commitment over bound leaves can establish.
+    /// @dev The leaf carries a content hash and a generation time, but only the
+    ///      generation time is a quantity a threshold can be compared against.
+    ///
+    ///      SCHEMA_HASH was removed. The leaf holds keccak256(recordBytes), the
+    ///      digest of ONE RECORD, while a schema threshold is the digest of a
+    ///      SHAPE. Comparing them under BYTES32_EQ made every record that
+    ///      genuinely conformed to the schema a valid counterexample, so the
+    ///      claim is refused at open rather than opened as protection that could
+    ///      never hold. It stays in ClaimType because it remains a nameable
+    ///      promise. It is simply not one this contract protects.
     function _establishedByBoundLeaves(ClaimType ct) private pure returns (bool) {
-        return ct == ClaimType.RECORD_GENERATION_TIME || ct == ClaimType.SCHEMA_HASH;
+        return ct == ClaimType.RECORD_GENERATION_TIME;
     }
 
+    /// @dev Reached only after _establishedByBoundLeaves has passed, so the
+    ///      generation time is the sole observable. The guard is defence in
+    ///      depth: it reverts rather than returning a value for a claim the
+    ///      bound leaves do not establish.
     function _observed(ClaimType ct, BreachProof calldata proof) private pure returns (bytes32) {
-        if (ct == ClaimType.RECORD_GENERATION_TIME) {
-            return bytes32(uint256(proof.generatedAt));
-        }
-        // ClaimType.SCHEMA_HASH
-        return keccak256(proof.recordBytes);
+        if (ct != ClaimType.RECORD_GENERATION_TIME) revert ClaimNotEstablishedByBoundLeaves();
+        return bytes32(uint256(proof.generatedAt));
     }
 
     function purchaseOf(bytes32 specHash) external view returns (Purchase memory) {

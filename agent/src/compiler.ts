@@ -1,4 +1,4 @@
-import { keccak256, pad, toHex, type Address, type Hex } from "viem";
+import { pad, toHex, type Address, type Hex } from "viem";
 import { ClaimType, Opcode, Quantifier, type Condition } from "./types.js";
 
 /**
@@ -14,6 +14,13 @@ import { ClaimType, Opcode, Quantifier, type Condition } from "./types.js";
  *
  * BLOB_EXISTENCE_TIME is deliberately absent: it fits neither settlement path,
  * because it is a property of the file rather than of the delivery's contents.
+ *
+ * SCHEMA_HASH is absent for a different reason. The leaf binds
+ * keccak256(recordBytes), the digest of one record, and the settlement path
+ * observes exactly that. A schema is the digest of a shape, so comparing the two
+ * under BYTES32_EQ made every conforming record a valid counterexample. The rule
+ * that emitted it was cut rather than stretching the leaf or the opcode set to
+ * fit the phrase, so `every record matches schema "..."` is now UNPROTECTABLE.
  */
 type Rule = {
   id: string;
@@ -73,18 +80,6 @@ const RULES: Rule[] = [
       quantifier: Quantifier.UNIVERSAL,
       opcode: Opcode.TIMESTAMP_GTE,
       threshold: pad(toHex(ctx.now - BigInt(m[1]) * 60n), { size: 32 }),
-      permittedIssuer: ctx.permittedIssuer,
-      expectedSourceId: ctx.expectedSourceId,
-    }),
-  },
-  {
-    id: "record-schema",
-    pattern: /every record matches schema "([^"]+)"/i,
-    build: (m, ctx) => ({
-      requires: ClaimType.SCHEMA_HASH,
-      quantifier: Quantifier.UNIVERSAL,
-      opcode: Opcode.BYTES32_EQ,
-      threshold: keccak256(toHex(m[1])),
       permittedIssuer: ctx.permittedIssuer,
       expectedSourceId: ctx.expectedSourceId,
     }),

@@ -976,14 +976,25 @@ contract RecourseTest is Test {
         vm.expectRevert(RecourseEscrow.UnsettleableUniversalCondition.selector);
         escrow.openPurchase(terms2, offers2, _sign(BUYER_PK, spec2), _sign(SELLER_PK, spec2));
 
-        // Both claims the bound leaves do carry still open normally.
-        _open(_terms(bytes32(uint256(3))));
-        Condition[] memory cs4 = new Condition[](1);
-        cs4[0] = _freshness(CONDITION_ID, upstream);
-        cs4[0].requires = ClaimType.SCHEMA_HASH;
-        cs4[0].opcode = Opcode.BYTES32_EQ;
-        _open(_termsWith(bytes32(uint256(4)), cs4));
-        assertEq(usdc.balanceOf(address(escrow)), 2 * AMOUNT, "settleable universal claims open");
+        // SCHEMA_HASH: the leaf does carry a content digest, but a schema
+        // threshold is the digest of a shape and not of a record. Under
+        // BYTES32_EQ every conforming record would be a counterexample, so the
+        // claim is refused here rather than opened as protection that can never
+        // hold. See contracts/test/SchemaHashCondition.t.sol for the evidence.
+        Condition[] memory cs3 = new Condition[](1);
+        cs3[0] = _freshness(CONDITION_ID, upstream);
+        cs3[0].requires = ClaimType.SCHEMA_HASH;
+        cs3[0].opcode = Opcode.BYTES32_EQ;
+        PurchaseTerms memory terms3 = _termsWith(bytes32(uint256(3)), cs3);
+        bytes32 spec3 = escrow.specHashOf(terms3);
+        EvidenceOffer[] memory offers3 = _offersFor(cs3);
+        vm.expectRevert(RecourseEscrow.UnsettleableUniversalCondition.selector);
+        escrow.openPurchase(terms3, offers3, _sign(BUYER_PK, spec3), _sign(SELLER_PK, spec3));
+        assertEq(usdc.balanceOf(address(escrow)), 0, "no escrow opened for a schema claim");
+
+        // The one claim bound leaves do establish still opens normally.
+        _open(_terms(bytes32(uint256(4))));
+        assertEq(usdc.balanceOf(address(escrow)), AMOUNT, "the settleable universal claim opens");
     }
 
     function testPredicateEvaluatorIsTotal() public pure {

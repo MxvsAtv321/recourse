@@ -146,8 +146,10 @@ export type ThresholdKind = "timestamp" | "count" | "hash";
  *
  * Derived from the opcode, because the opcode is what decides how the value is
  * compared and therefore what it is. Deriving it from the quantifier was wrong:
- * a SCHEMA_HASH condition is UNIVERSAL but its threshold is a digest, not a
- * time, and labelling it "timestamp" made the UI render a keccak hash as a date.
+ * the SCHEMA_HASH condition that used to exist was UNIVERSAL but carried a
+ * digest threshold, not a time, and labelling it "timestamp" made the UI render
+ * a keccak hash as a date. That rule has since been cut, but the derivation
+ * stays opcode-driven and total over the whole opcode set.
  */
 export function thresholdKindFor(opcode: string): ThresholdKind {
   switch (opcode) {
