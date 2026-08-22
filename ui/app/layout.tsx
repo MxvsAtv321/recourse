@@ -24,7 +24,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Recourse — buyer protection for autonomous commerce",
+  title: "Recourse — a compiler for delivery promises",
   description:
     "Recourse makes objectively falsifiable delivery promises enforceable at settlement. One counterexample refunds the buyer.",
 };

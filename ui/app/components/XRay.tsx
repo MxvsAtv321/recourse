@@ -1,116 +1,23 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import {
-  TIMING,
-  gateOnAt,
-  manifestOnAt,
-  reasonOnAt,
-  targetOnAt,
-  type LaneView,
-  type XRayView,
-} from "../../../agent/src/xray";
+import type { XRayView } from "../../../agent/src/xray";
 
 /**
- * Five lanes attempting one claim. Nothing here knows an artifact name, a gate,
- * a verdict or a reason. Every string rendered below comes from the view the
- * engine produced.
+ * PROTECT: the purchasing policy, the manifest and the refusal.
+ *
+ * The lane board that used to live here is replaced by the compile surface,
+ * which reports the same failures as typed errors against exact source spans.
+ * Nothing below is gated behind an animation any more: it renders on the server
+ * and a dead client costs nothing.
  */
 export function XRay({ view }: { view: XRayView }) {
-  const laneCount = view.lanes.length;
-  const last = manifestOnAt(laneCount);
-  const [tick, setTick] = useState(0);
-  const [run, setRun] = useState(0);
-
-  // The dark claim field sits directly above the board and states the same
-  // sentence, so the condensed copy is redundant until it is actually stuck.
-  const stickyRef = useRef<HTMLDivElement>(null);
-  const [stuck, setStuck] = useState(false);
-  useEffect(() => {
-    const el = stickyRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    // rootMargin accepts px and % only, never rem. Measure the masthead instead
-    // of restating its height, so this cannot drift from the CSS.
-    const mast = document.querySelector(".masthead");
-    const offset = Math.ceil(mast?.getBoundingClientRect().height ?? 58) + 1;
-    let io: IntersectionObserver;
-    try {
-      io = new IntersectionObserver(([e]) => setStuck(e.intersectionRatio < 1), {
-        threshold: [1],
-        rootMargin: `-${offset}px 0px 0px 0px`,
-      });
-    } catch {
-      // A stuck detector is a nicety. It must never be able to take the page
-      // down, so fall back to showing the condensed claim always.
-      setStuck(true);
-      return;
-    }
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const reduce =
-      typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      setTick(last);
-      return;
-    }
-    setTick(0);
-    const id = setInterval(() => setTick((t) => (t >= last ? t : t + 1)), TIMING.tickMs);
-    return () => clearInterval(id);
-  }, [last, run]);
-
   return (
     <>
-      <div className="xray">
-        <div className={stuck ? "claim-sticky stuck" : "claim-sticky"} ref={stickyRef}>
-          <span className="q">&ldquo;{view.claim.quote}&rdquo;</span>
-          <span className="m">
-            {view.claim.subject} &middot; {view.claim.property.replace(/_/g, " ")} &middot;{" "}
-            <b>{view.claim.seconds}s</b>
-          </span>
-        </div>
-
-        <div className="xray-board">
-          <div className="xray-head">
-            <div />
-            {view.gates.map((g) => (
-              <div className="gate-label" key={g.index}>
-                gate {g.index}
-                <b>{g.short}</b>
-              </div>
-            ))}
-            <div className="target-label">the claim</div>
-          </div>
-
-          {view.lanes.map((lane, i) => (
-            <Lane key={lane.id} lane={lane} index={i} tick={tick} />
-          ))}
-        </div>
-
-        <div className="xray-foot">
-          <span>
-            {view.lanes.filter((l) => l.crosses).length} of {laneCount} reach the claim. Fixtures recorded{" "}
-            {view.observedWindow}, never re-fetched.
-          </span>
-          <button className="replay" type="button" onClick={() => setRun((r) => r + 1)}>
-            replay
-          </button>
-        </div>
-      </div>
-
       <PolicyPanel view={view} />
-      {view.manifest ? <ManifestPanel view={view} on={tick >= last} /> : null}
-      {view.refusal ? <RefusalPanel view={view} on={tick >= last} /> : null}
+      {view.manifest ? <ManifestPanel view={view} /> : null}
+      {view.refusal ? <RefusalPanel view={view} /> : null}
     </>
   );
 }
 
-/**
- * The policy, printed as it runs. No model ranks, scores, recommends or selects:
- * the rule below is a total function of the policy object and the offers.
- */
 /**
  * The policy is the buyer's input, not a result of the animation, so it is never
  * gated behind the lanes resolving. A judge must be able to read the rule and
@@ -244,11 +151,11 @@ function Highlighted({ text, spans }: { text: string; spans: [number, number][] 
   return <>{out}</>;
 }
 
-function ManifestPanel({ view, on }: { view: XRayView; on: boolean }) {
+function ManifestPanel({ view }: { view: XRayView }) {
   const m = view.manifest!;
   const spans = m.literals.map((l) => l.span).filter((s): s is [number, number] => s !== null);
   return (
-    <section className={on ? "manifest-wrap on" : "manifest-wrap"} style={{ marginTop: "3.5rem" }}>
+    <section className="manifest-wrap on" style={{ marginTop: "3.5rem" }}>
       <span className="eyebrow" data-step="PROTECT">
         Protection manifest
       </span>
@@ -314,10 +221,10 @@ function ManifestPanel({ view, on }: { view: XRayView; on: boolean }) {
   );
 }
 
-function RefusalPanel({ view, on }: { view: XRayView; on: boolean }) {
+function RefusalPanel({ view }: { view: XRayView }) {
   const r = view.refusal!;
   return (
-    <section className={on ? "manifest-wrap on refusal" : "manifest-wrap refusal"}>
+    <section className="manifest-wrap on refusal">
       <span className="eyebrow" data-step="LIMIT">
         {r.status}
       </span>
@@ -346,74 +253,5 @@ function RefusalPanel({ view, on }: { view: XRayView; on: boolean }) {
         </div>
       </div>
     </section>
-  );
-}
-
-function Lane({ lane, index, tick }: { lane: LaneView; index: number; tick: number }) {
-  const gates = [1, 2, 3, 4];
-  const reasonOn = !lane.crosses && tick >= reasonOnAt(index, lane.stopsAt);
-  const targetOn = lane.crosses && tick >= targetOnAt(index);
-
-  return (
-    <div className="lane">
-      <div className="lane-name">
-        <span className={lane.nameIsMono ? "n mono" : "n"}>{lane.name}</span>
-        <span className="s">{lane.source}</span>
-      </div>
-
-      {gates.map((g) => {
-        // A lane that crosses travels every segment. A lane that stops travels
-        // the segments before its gate, then a stub and a terminal bar in it.
-        const travelled = lane.crosses || g < lane.stopsAt;
-        const terminal = !lane.crosses && g === lane.stopsAt;
-        const on = tick >= gateOnAt(index, g);
-        // Every cell in the row is placed explicitly. The reason block occupies
-        // row 1 too, and auto-placement would otherwise route these around it.
-        const place = { gridColumn: g + 1, gridRow: 1 } as React.CSSProperties;
-        if (!travelled && !terminal) return <div className="seg dead" key={g} style={place} />;
-        return (
-          <div className={`seg${on ? " on" : ""}${terminal ? " term" : ""}`} key={g} style={place}>
-            <div className={terminal ? "path stub" : "path full"} />
-            {travelled ? <div className="node" /> : null}
-            {terminal ? <div className="stop" /> : null}
-          </div>
-        );
-      })}
-
-      <div className={targetOn ? "lane-target on" : "lane-target"}>
-        {lane.crosses ? (
-          <>
-            <span className="v">{lane.verdict}</span>
-            <span className="b">{lane.settlesBy}</span>
-          </>
-        ) : null}
-      </div>
-
-      {!lane.crosses ? (
-        <div
-          className={reasonOn ? "reason on" : "reason"}
-          style={
-            {
-              "--from": String(lane.stopsAt + 1),
-              "--span": String(5 - lane.stopsAt),
-            } as React.CSSProperties
-          }
-        >
-          <div className="code">
-            <span>{lane.code?.replace(/_/g, " ")}</span>
-            <span className="how">{lane.discovery === "MEASURED" ? "found by measuring" : "found by reading"}</span>
-          </div>
-          <div className="h">{lane.headline}</div>
-          {lane.showsCommits ? (
-            <div className="commits">
-              <em>commits to</em>
-              {lane.commitsTo.map((c) => (
-                <span key={c}>{c}</span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
   );
 }

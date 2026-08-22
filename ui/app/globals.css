@@ -1601,3 +1601,323 @@ details[open] .chev {
 }
 .decision p { color: var(--ink-2); max-width: 70ch; }
 .decision .funded { margin-top: 0.5rem; font-size: 0.9rem; color: var(--ink-3); }
+
+/* ================================================================ the closing frame
+   The last thing on screen, and read from the back of a room. Three lines, five
+   rows, one sentence. The dark field is the same ink the claim and the target
+   rail use, so the page ends on the colour it argued in. */
+
+.closing {
+  background: var(--ink);
+  color: var(--paper);
+  padding-block: clamp(4.5rem, 11vw, 9rem);
+}
+
+/* price, payment, and the one that is not solved yet */
+.closing .layers {
+  display: grid;
+  gap: 0.35rem;
+  border-bottom: 1px solid rgba(245, 243, 238, 0.16);
+  padding-bottom: clamp(2rem, 4vw, 3.25rem);
+}
+.closing .layer {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11rem) 1fr;
+  gap: clamp(1rem, 3vw, 2.5rem);
+  align-items: baseline;
+}
+.closing .lk {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.72rem, 1.05vw, 0.92rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(245, 243, 238, 0.42);
+}
+.closing .lv {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.7rem, 3.9vw, 3.1rem);
+  line-height: 1.12;
+  color: rgba(245, 243, 238, 0.4);
+}
+/* The unsolved line is the only one at full brightness. */
+.closing .layer.now .lk { color: rgba(245, 243, 238, 0.72); }
+.closing .layer.now .lv { color: var(--paper); }
+.closing .layer.now em {
+  font-style: italic;
+  color: color-mix(in srgb, var(--accent) 32%, var(--paper));
+}
+
+/* what each verification capability unlocks */
+.closing .unlocks {
+  display: grid;
+  gap: 0;
+  margin: clamp(2rem, 4vw, 3.25rem) 0 clamp(2.75rem, 6vw, 4.5rem);
+  max-width: 46rem;
+}
+.closing .unlocks > div {
+  display: grid;
+  grid-template-columns: minmax(9rem, 15rem) 1fr;
+  gap: clamp(1rem, 3vw, 2.5rem);
+  align-items: baseline;
+  padding: 0.62rem 0;
+  border-bottom: 1px solid rgba(245, 243, 238, 0.1);
+}
+.closing .unlocks dt {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.8rem, 1.15vw, 1rem);
+  letter-spacing: 0.03em;
+  color: rgba(245, 243, 238, 0.5);
+}
+.closing .unlocks dd {
+  margin: 0;
+  font-size: clamp(1.05rem, 1.9vw, 1.5rem);
+  color: var(--paper);
+}
+
+/* the focal point */
+.closing .closer {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(2.3rem, 6vw, 5rem);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  max-width: 18ch;
+}
+.closing .closer em {
+  font-style: italic;
+  color: color-mix(in srgb, var(--accent) 32%, var(--paper));
+}
+
+@media (max-width: 620px) {
+  .closing .layer,
+  .closing .unlocks > div { grid-template-columns: 1fr; gap: 0.1rem; }
+}
+
+/* ================================================================ the compile surface */
+
+.compiler { margin-top: 1.5rem; }
+
+.src-pair { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .src-pair { grid-template-columns: 1fr 1fr; gap: 1.75rem; } }
+.src { border-top: 2px solid var(--ink); padding-top: 0.85rem; }
+.src .sk {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.68rem, 0.95vw, 0.8rem);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.src .st {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.05rem, 1.75vw, 1.4rem);
+  line-height: 1.3;
+  margin-top: 0.4rem;
+  color: var(--ink);
+}
+
+.compile-action {
+  display: block;
+  width: 100%;
+  margin: 1.75rem 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.85rem, 1.4vw, 1.1rem);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--ink);
+  border: 0;
+  border-radius: var(--r-md);
+  padding: 1rem 1.2rem;
+  cursor: pointer;
+}
+.compile-action:hover { background: #000; }
+
+/* one compilation */
+.unit { border-top: 1px solid var(--line); padding: 1.75rem 0 1.9rem; }
+.unit.active { background: color-mix(in srgb, var(--accent-wash) 60%, transparent); }
+.unit-head { display: flex; align-items: baseline; gap: 0.85rem; margin-bottom: 1rem; }
+.unit-head .ord {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 999px;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.unit-head .ut { font-size: clamp(1rem, 1.6vw, 1.25rem); color: var(--ink-2); }
+
+.usrc {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.25rem, 2.4vw, 2rem);
+  line-height: 1.3;
+  color: var(--ink);
+  max-width: 44ch;
+}
+.usrc-k {
+  display: block;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.66rem, 0.9vw, 0.76rem);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.3rem;
+}
+/* the compiler squiggle, on the exact span the diagnostic points at */
+.usrc u {
+  text-decoration: underline wavy var(--clay);
+  text-underline-offset: 0.28em;
+  text-decoration-thickness: 2px;
+}
+.uclaim {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.78rem, 1.1vw, 0.94rem);
+  color: var(--ink-2);
+  margin-top: 0.85rem;
+}
+.uclaim b { color: var(--accent); font-weight: 600; }
+
+.diag { margin-top: 1.15rem; border-left: 3px solid var(--clay); padding-left: 1rem; }
+.diag .dcode {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.85rem, 1.25vw, 1.05rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--clay);
+  display: block;
+}
+.diag .dat {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.72rem, 1vw, 0.85rem);
+  color: var(--ink-3);
+  display: block;
+  margin-top: 0.15rem;
+}
+.diag .dline {
+  font-size: clamp(0.98rem, 1.5vw, 1.2rem);
+  line-height: 1.45;
+  color: var(--ink-2);
+  margin-top: 0.4rem;
+  max-width: 62ch;
+}
+.diag .dline b { color: var(--ink); font-weight: 600; }
+
+.ustatus {
+  margin-top: 1.35rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.95rem, 1.6vw, 1.3rem);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ustatus.no { color: var(--clay); }
+.ustatus.ok { color: var(--accent); }
+
+/* the witness spec, as the artifact it is */
+.witness { margin-top: 1.4rem; background: var(--ink); color: var(--paper); border-radius: var(--r-lg); padding: 1.5rem 1.6rem 1.7rem; }
+.witness .wk {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.68rem, 0.95vw, 0.8rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(245, 243, 238, 0.5);
+}
+.witness .wsay {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.3rem, 2.5vw, 2.05rem);
+  line-height: 1.2;
+  margin-top: 0.5rem;
+  max-width: 26ch;
+}
+.witness .wsay b { color: color-mix(in srgb, var(--accent) 32%, var(--paper)); font-weight: 400; font-style: italic; }
+.wgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0; margin: 1.4rem 0 0; border-top: 1px solid rgba(245, 243, 238, 0.16); }
+.wgrid > div { padding: 0.9rem 1rem 0.95rem 0; border-right: 1px solid rgba(245, 243, 238, 0.12); }
+.wgrid > div:last-child { border-right: 0; }
+.wgrid dt {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(245, 243, 238, 0.45);
+}
+.wgrid dd { margin: 0.35rem 0 0; font-size: clamp(0.92rem, 1.3vw, 1.08rem); font-weight: 600; }
+.wgrid dd.waddr { font-family: var(--font-mono), ui-monospace, monospace; font-size: clamp(0.62rem, 0.85vw, 0.75rem); font-weight: 500; overflow-wrap: anywhere; }
+.wgrid .wneg { display: block; font-weight: 400; font-size: 0.72rem; color: rgba(245, 243, 238, 0.5); margin-top: 0.2rem; font-family: var(--font-mono), ui-monospace, monospace; }
+
+/* the identifier that must read identically before and after */
+.wid, .pf-ids .pv {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.72rem, 1.35vw, 1.05rem);
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+}
+.wid { margin-top: 1.4rem; border-top: 1px solid rgba(245, 243, 238, 0.16); padding-top: 1rem; }
+.wid .widk {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(245, 243, 238, 0.5);
+  margin-bottom: 0.35rem;
+}
+.wid .widv { color: color-mix(in srgb, var(--accent) 30%, var(--paper)); font-weight: 600; }
+.witness .wnote { margin-top: 1rem; font-size: 0.85rem; color: rgba(245, 243, 238, 0.55); }
+
+/* ---------------------------------------------------------------- the payoff */
+
+.payoff { margin-top: 2rem; border-top: 2px solid var(--ink); padding-top: 1.5rem; }
+.pf-ids { display: grid; gap: 1rem; }
+.pf-ids .pk {
+  display: block;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.66rem, 0.9vw, 0.76rem);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.3rem;
+}
+.pf-ids .pv { display: block; color: var(--accent); font-weight: 600; }
+.pf-verdict {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.5rem, 3vw, 2.4rem);
+}
+.pf-verdict.ok { color: var(--accent); }
+.pf-verdict.no { color: var(--clay); }
+
+.pf-head {
+  margin-top: 1.6rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.7rem, 0.95vw, 0.8rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.pf-fields { display: grid; gap: 0; margin-top: 0.6rem; }
+.pff {
+  display: grid;
+  grid-template-columns: 1.2rem minmax(10rem, max-content) 1fr;
+  column-gap: 0.75rem;
+  row-gap: 0.2rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--line);
+  align-items: baseline;
+}
+.pff .m { font-weight: 700; }
+.pff.ok .m { color: var(--accent); }
+.pff.no .m { color: var(--clay); }
+.pff .fn { font-weight: 600; font-size: clamp(0.92rem, 1.3vw, 1.08rem); }
+.pff .fsrc {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.66rem, 0.9vw, 0.76rem);
+  letter-spacing: 0.06em;
+}
+.pff .fsrc.chain { color: var(--accent); }
+.pff .fsrc.fixture { color: var(--clay); }
+.pff .fv { grid-column: 2 / -1; margin: 0.15rem 0 0; display: grid; gap: 0.1rem; font-family: var(--font-mono), ui-monospace, monospace; font-size: clamp(0.7rem, 0.95vw, 0.8rem); color: var(--ink-3); overflow-wrap: anywhere; }
+.pf-note { margin-top: 1rem; font-size: 0.9rem; color: var(--ink-2); max-width: 68ch; }
+.pf-tx { margin-top: 0.6rem; font-family: var(--font-mono), ui-monospace, monospace; font-size: 0.72rem; color: var(--ink-3); overflow-wrap: anywhere; }

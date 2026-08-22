@@ -73,6 +73,18 @@ const RULES: Rule[] = [
     }),
   },
   {
+    id: "record-freshness-seconds",
+    pattern: /every record (?:is )?generated within the last (\d+) seconds?/i,
+    build: (m, ctx) => ({
+      requires: ClaimType.RECORD_GENERATION_TIME,
+      quantifier: Quantifier.UNIVERSAL,
+      opcode: Opcode.TIMESTAMP_GTE,
+      threshold: pad(toHex(ctx.now - BigInt(m[1])), { size: 32 }),
+      permittedIssuer: ctx.permittedIssuer,
+      expectedSourceId: ctx.expectedSourceId,
+    }),
+  },
+  {
     id: "record-freshness-minutes",
     pattern: /every record (?:is )?generated within the last (\d+) minutes?/i,
     build: (m, ctx) => ({

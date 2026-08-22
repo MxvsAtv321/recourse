@@ -3,6 +3,8 @@ import { Verification } from "./components/Verification";
 import { compactAddresses, duration, money, pct, shortHash, stamp } from "../lib/format";
 import { loadRun } from "../lib/run";
 import { buildXRay } from "../../agent/src/xray";
+import { buildCompile } from "../../agent/src/compile";
+import { Compiler, Payoff } from "./components/Compiler";
 
 export const dynamic = "force-dynamic";
 
@@ -29,13 +31,45 @@ export default function Page() {
   const xray = buildXRay();
   const run = loadRun();
 
+  // The requirement the compile surface uses is the phrase the signed terms
+  // carry, so the page and the escrow cannot drift apart between acts.
+  const c = run?.protectedPurchase.conditions[0];
+  const compile = buildCompile(
+    c
+      ? {
+          conditionId: c.conditionId,
+          sourceQuote: c.sourceQuote,
+          claimType: c.claimType,
+          quantifier: c.quantifier,
+          opcode: c.opcode,
+          threshold: c.threshold,
+          permittedIssuer: c.permittedIssuer,
+          expectedSourceId: c.expectedSourceId,
+        }
+      : null,
+    run
+      ? {
+          index: run.protectedPurchase.proof.index,
+          offendingIndex: run.protectedPurchase.settlement.offendingIndex,
+          observed: run.protectedPurchase.scan.observedAt,
+          thresholdAt: run.protectedPurchase.scan.thresholdAt,
+          conditionId: run.protectedPurchase.conditions[0].conditionId,
+          claimType: run.protectedPurchase.conditions[0].claimType,
+          quantifier: run.protectedPurchase.conditions[0].quantifier,
+          sourceId: run.protectedPurchase.commitment.sourceId,
+          issuer: run.protectedPurchase.commitment.issuer,
+          leafFormula: run.protectedPurchase.commitment.leafFormula,
+        }
+      : null,
+  );
+
   return (
     <main>
       <header className="masthead">
         <div className="shell masthead-inner">
           <div className="wordmark">
             <strong>Recourse</strong>
-            <span>Buyer protection for autonomous commerce</span>
+            <span>A compiler for delivery promises</span>
           </div>
           {run ? (
             <span className="livechip">
@@ -174,9 +208,9 @@ export default function Page() {
       <section className="claim-field" data-act="INSPECT">
         <div className="shell">
           <span className="eyebrow" data-step="INSPECT">
-            So the buyer states a claim
+            So the buyer states a requirement
           </span>
-          <h1 className="claim-quote">&ldquo;{xray.claim.quote}&rdquo;</h1>
+          <h1 className="claim-quote">&ldquo;{compile.requirement}&rdquo;</h1>
           <div className="claim-meta">
             <span>
               subject <b>{xray.claim.subject}</b>
@@ -194,9 +228,21 @@ export default function Page() {
         </div>
       </section>
 
-      {/* The x-ray, then the manifest and the refusal, are one client component
-          so the PROTECT act reveals only once the lanes have resolved. */}
-      <section className="shell section" style={{ borderTop: 0, paddingTop: "0.75rem" }} data-act="INSPECT">
+      <section className="shell section" style={{ borderTop: 0, paddingTop: "1.25rem" }} data-act="INSPECT">
+        <div className="section-head">
+          <span className="eyebrow" data-step="COMPILE">
+            The compiler
+          </span>
+          <h2>A promise either compiles to something checkable, or it does not.</h2>
+          <p>
+            Two pieces of text go in. Three compilations run in sequence. A failure is a typed error against an exact
+            span of the source it is about.
+          </p>
+        </div>
+        <Compiler view={compile} />
+      </section>
+
+      <section className="shell section" data-act="PROTECT">
         <XRay view={xray} />
       </section>
 
@@ -300,6 +346,12 @@ export default function Page() {
               symbol={run.meta.assetSymbol}
               amount={run.protectedPurchase.amount}
             />
+
+            <Payoff
+              view={compile}
+              txHash={run.protectedPurchase.settlement.txHash}
+              verdict={run.protectedPurchase.settlement.verdict}
+            />
           </section>
 
           <section className="shell section" data-act="ENFORCE">
@@ -375,6 +427,58 @@ export default function Page() {
           ) : null}
         </div>
       </footer>
+
+      {/* ============================================================ CLOSING
+          The last frame. Read from the back of a room: three lines, five rows,
+          one sentence. Nothing here is derived from the engine, because nothing
+          here is a measurement. */}
+      <section className="closing">
+        <div className="shell">
+          <div className="layers">
+            <div className="layer">
+              <span className="lk">price</span>
+              <span className="lv">machine-readable</span>
+            </div>
+            <div className="layer">
+              <span className="lk">payment</span>
+              <span className="lv">machine-verifiable</span>
+            </div>
+            <div className="layer now">
+              <span className="lk">the promise</span>
+              <span className="lv">
+                <em>not yet</em>
+              </span>
+            </div>
+          </div>
+
+          <dl className="unlocks">
+            <div>
+              <dt>record freshness</dt>
+              <dd>data feeds</dd>
+            </div>
+            <div>
+              <dt>schema and count</dt>
+              <dd>datasets, APIs</dd>
+            </div>
+            <div>
+              <dt>deterministic tests</dt>
+              <dd>generated code</dd>
+            </div>
+            <div>
+              <dt>latency receipts</dt>
+              <dd>inference, compute</dd>
+            </div>
+            <div>
+              <dt>provenance</dt>
+              <dd>training data</dd>
+            </div>
+          </dl>
+
+          <p className="closer">
+            One bad record. One proof. <em>No arbiter.</em>
+          </p>
+        </div>
+      </section>
     </main>
   );
 }

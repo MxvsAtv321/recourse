@@ -50,13 +50,13 @@ const AMOUNT = BigInt(PROTECTED_PRICE_MICROS); // the selected offer's price; US
 const RECORD_COUNT = 500;
 const CHALLENGE_WINDOW = 30n;
 const CURE_PERIOD = 20n;
-const FRESH_BY = 90n; // a minute and a half old
+const FRESH_BY = 20n; // inside a 60 second window
 const STALE_BY = 26n * 3600n; // yesterday's data
 const STALE_ONSET = 187; // the feed goes stale partway through the collection run
 /** Scenarios 1 and 2 are the same delivery, so they share one age policy. */
 const MIXED_AGES = partiallyStale(FRESH_BY, STALE_BY, STALE_ONSET);
 const DELIVERY_GRACE = 600n; // seconds the seller has to commit
-const FRESHNESS_TERM = "every record generated within the last 1 hour";
+const FRESHNESS_TERM = "every record generated within the last 60 seconds";
 const ROW_COUNT_TERM = "at least 500 records";
 
 let usdc: Address;
@@ -400,7 +400,7 @@ async function scenarioRelease() {
   await send(escrow, ESCROW_ABI, "openPurchase", [terms, offersFor(conditions), buyerSig, sellerSig], accounts.seller);
   item(true, `purchase ${specHash.slice(0, 18)}... opened, ${usd(AMOUNT)} escrowed`);
 
-  const records = buildDelivery(RECORD_COUNT, now, 120n);
+  const records = buildDelivery(RECORD_COUNT, now, 20n);
   const tree = commitTo(records);
   await commitAll(terms, specHash, tree.root, tree.leafCount, payloadRefOf(records));
   item(true, `all ${RECORD_COUNT} records generated 2 minutes ago, leafCount ${tree.leafCount} committed`);

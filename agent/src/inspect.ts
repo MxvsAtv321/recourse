@@ -29,7 +29,13 @@ import {
 
 export type Dimension = "SUBJECT" | "PROPERTY" | "THRESHOLD" | "FRAME" | "ISSUER" | "SOURCE";
 
-export type Missing = { dimension: Dimension; why: string };
+export type Missing = {
+  dimension: Dimension;
+  why: string;
+  /** Where in the source the failure points, when the source contains it. */
+  span?: Span;
+  source?: "REQUIREMENT" | "OFFER";
+};
 
 /**
  * What a classifier is allowed to emit. Labels and character spans, never
@@ -44,6 +50,10 @@ export type Classification = {
   frameKind?: "AGREEMENT_TIME" | "CHAIN_TIME" | "ARTIFACT_FIELD";
   spans: {
     quantifier?: Span;
+    /** The phrase naming what the claim is about. */
+    subject?: Span;
+    /** The phrase naming the observable. */
+    property?: Span;
     amount?: Span;
     unit?: Span;
     frameField?: Span;
@@ -72,15 +82,45 @@ const groupSpan = (m: RegExpExecArray, group: number): Span | undefined => {
 
 const RULES: { id: string; re: RegExp; build: (m: RegExpExecArray) => Classification }[] = [
   {
+    // Grouped so a diagnostic can point at the exact phrase that names each
+    // dimension, rather than at the whole sentence.
     id: "record-freshness",
-    re: /every record (?:is )?generated within the last (\d+) (second|minute|hour)s?/i,
+    re: /(every record)\s+(?:is\s+)?(generated)\s+within the last\s+(\d+)\s+(second|minute|hour)s?/i,
     build: (m) => ({
       ruleId: "record-freshness",
       subject: "RECORD",
       property: "GENERATION_TIME",
       op: "AT_OR_AFTER",
       frameKind: "AGREEMENT_TIME",
-      spans: { quantifier: groupSpan(m, 0), amount: groupSpan(m, 1), unit: groupSpan(m, 2) },
+      spans: {
+        quantifier: groupSpan(m, 0),
+        subject: groupSpan(m, 1),
+        property: groupSpan(m, 2),
+        amount: groupSpan(m, 3),
+        unit: groupSpan(m, 4),
+      },
+    }),
+  },
+  {
+    // A vendor phrase that names freshness and carries no comparable value.
+    // It locates the word so the failure has somewhere exact to point.
+    id: "freshness-named-without-threshold",
+    re: /\b(real[\s-]?time|live data|up[\s-]to[\s-]date|always current)\b/i,
+    build: (m) => ({
+      ruleId: "freshness-named-without-threshold",
+      subject: "RECORD",
+      property: "GENERATION_TIME",
+      op: "AT_OR_AFTER",
+      frameKind: "AGREEMENT_TIME",
+      spans: { property: groupSpan(m, 1) },
+      unlocated: [
+        {
+          dimension: "THRESHOLD",
+          why: "the phrase names freshness but carries no comparable value, so it compiles to no executable proposition",
+          span: groupSpan(m, 1),
+          source: "REQUIREMENT",
+        },
+      ],
     }),
   },
   {

@@ -27,6 +27,8 @@ const check = (label: string, ok: boolean, detail = "") => {
   if (!ok) failures.push(label);
   console.log(`  ${ok ? "PASS" : "FAIL"}  ${label}${detail ? `  ${detail}` : ""}`);
 };
+/** Not a pass. Something the environment prevented this run from testing. */
+const skip = (label: string, why: string) => console.log(`  SKIP  ${label}  ${why}`);
 
 const strip = (h: string) => h.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]+>/g, " ");
 const ent = (s: string) =>
@@ -157,147 +159,116 @@ check("npm run build succeeds with no errors", /Compiled successfully/.test(out)
 check("the /inspect route is emitted", /\/inspect/.test(out));
 
 const first = await serve(async (html) => {
-  head("1  THE X-RAY RENDERS ONE CLAIM AND FIVE LANES");
+  head("1  ONE CLAIM RUNS THE WHOLE PAGE");
+
   const claimMatch = html.match(/class="claim-quote">([\s\S]*?)<\/h1>/);
   const claimText = claimMatch ? flat(claimMatch[1]) : "";
-  const metaMatch = html.match(/class="claim-meta">([\s\S]*?)<\/div>\s*<\/div>/);
-  console.log(`\n  claim   ${claimText}`);
-  console.log(`  meta    ${metaMatch ? flat(metaMatch[1]) : ""}`);
-  check("exactly one claim rendered", (html.match(/class="claim-quote"/g) ?? []).length === 1);
-  check("the claim is the buyer's own words", claimText.includes("every record generated within the last 60 seconds"));
+  const runJson = JSON.parse(readFileSync(`${ROOT}ui/data/run.json`, "utf8"));
+  const signedQuote = runJson.protectedPurchase.conditions[0].sourceQuote;
+  const wit = spawnSync("npm", ["run", "witness:check"], { cwd: ROOT, encoding: "utf8" }).stdout;
+  const witReq = (wit.match(/requirement, from the signed terms\s+"([^"]+)"/) ?? ["", ""])[1];
+  console.log(`\n  stated at the top of the page   ${claimText}`);
+  console.log(`  carried in the signed terms     "${signedQuote}"`);
+  console.log(`  the witness is synthesised from "${witReq}"`);
+  console.log(`  the proof that settled          index ${runJson.protectedPurchase.settlement.offendingIndex}`);
+  check("the page states the claim the terms carry", claimText.includes(signedQuote));
+  check("  and the witness is synthesised from that same claim", witReq === signedQuote);
+  check("  and it is the 60 second claim, not two different numbers", /60 seconds/.test(signedQuote));
+  check("  the proof that settled is at index 187", runJson.protectedPurchase.settlement.offendingIndex === "187");
+  check("  no other freshness claim appears anywhere on the page", !/last 1 hour|last 3600/.test(html));
 
-  const lanes = readLanes(html);
-  check("five artifact lanes", lanes.length === 5, String(lanes.length));
+  head("2  THREE COMPILATIONS, IN SEQUENCE");
 
-  const gateLabels = [...html.matchAll(/class="gate-label">([\s\S]*?)<\/div>/g)].map((m) => flat(m[1]));
-  console.log(`  gates   ${gateLabels.join("   ")}`);
-  check("four gate positions labelled", gateLabels.length === 4);
-
-  console.log("");
-  for (const [i, l] of lanes.entries()) {
-    rule();
-    console.log(`  lane ${i}  ${l.name}`);
-    console.log(`           ${l.source}`);
-    console.log(`           segments  ${l.segs.join("  ")}`);
-    if (l.code) console.log(`           STOPS AT GATE ${reach(l)}: ${l.code}  (${l.how})`);
-    if (l.headline) console.log(`           "${l.headline}"`);
-    if (l.commits.length) console.log(`           commits to: ${l.commits.join(", ")}`);
-    if (crosses(l)) console.log(`           REACHES THE CLAIM: ${l.target.join(" / ")}`);
-  }
-  rule();
-
-  head("2  GATE OCCUPANCY, SPEC 5.1");
-  for (const l of lanes) {
-    console.log(`  ${l.name.padEnd(30)} ${crosses(l) ? "crosses" : `stops at gate ${reach(l)}`}  ${l.code ?? ""}`);
-  }
-  const atGate = (g: number) => lanes.filter((l) => !crosses(l) && reach(l) === g);
-  console.log("");
-  check("two lanes terminate at gate 1", atGate(1).length === 2, atGate(1).map((l) => l.name).join(", "));
-  check(
-    "  with different rendered reasons",
-    new Set(atGate(1).map((l) => l.code)).size === 2,
-    atGate(1).map((l) => l.code).join("  vs  "),
+  const units = [...html.matchAll(/data-compilation="([^"]+)" data-status="([^"]+)">([\s\S]*?)(?=<section class="unit|<section class="shell)/g)].map(
+    (m) => {
+      const body = m[3];
+      return {
+        id: m[1],
+        status: m[2],
+        underlined: [...body.matchAll(/<u>([^<]+)<\/u>/g)].map((u) => u[1]),
+        diags: [...body.matchAll(/class="dcode">([^<]*)<[\s\S]*?class="dat">([^<]*)<[\s\S]*?class="dline">([\s\S]*?)<\/p>/g)].map((d) => ({
+          code: flat(d[1]),
+          at: flat(d[2]),
+          line: flat(d[3]),
+        })),
+      };
+    },
   );
-  check(
-    "  one found by reading, one by measuring",
-    new Set(atGate(1).map((l) => l.how)).size === 2,
-    atGate(1).map((l) => l.how).join("  vs  "),
-  );
-  check("one lane terminates at gate 2", atGate(2).length === 1, atGate(2).map((l) => l.code).join(""));
-  check("one lane terminates at gate 3", atGate(3).length === 1, atGate(3).map((l) => l.code).join(""));
-  check("exactly one lane reaches the claim", lanes.filter(crosses).length === 1);
-  const winner = lanes.find(crosses)!;
-  check(
-    "  and it reads ENFORCEABLE, settling by counterexample",
-    winner.target.includes("ENFORCEABLE") && winner.target.includes("COUNTEREXAMPLE"),
-    winner.target.join(" / "),
-  );
-
-  head("3  THE X402 LANE RENDERS ITS COMMITS-TO LIST");
-  const x = lanes.find((l) => l.name.includes("x402"))!;
-  console.log(`\n  ${x.name} commits to:  ${x.commits.join(", ")}`);
-  console.log(`  the claim is about:      ${claimText}`);
-  for (const f of ["version", "network", "resourceUrl", "payer", "issuedAt", "transaction"]) {
-    check(`  commitsTo includes ${f}`, x.commits.includes(f));
-  }
-  check("no other lane spends space on a field list", lanes.filter((l) => l.commits.length > 0).length === 1);
-
-  head("4  TIMING, FROM THE SAME CONSTANTS THE SCREEN RUNS ON");
-  console.log(
-    `\n  tick ${TIMING.tickMs}ms, ${TIMING.gateTicks} ticks per gate = ${TIMING.gateTicks * TIMING.tickMs}ms, stagger ${TIMING.staggerTicks} tick per lane\n`,
-  );
-  for (const [i, l] of lanes.entries()) {
-    const stop = crosses(l) ? 4 : reach(l);
-    const times = [1, 2, 3, 4].map((g) => `g${g} ${String(gateOnAt(i, g) * TIMING.tickMs).padStart(4)}ms`).join("  ");
-    const end = crosses(l)
-      ? `target  ${targetOnAt(i) * TIMING.tickMs}ms`
-      : `reason  ${reasonOnAt(i, stop) * TIMING.tickMs}ms`;
-    console.log(`  lane ${i}  ${times}   ->  ${end}`);
-  }
-  console.log(
-    `\n  all lanes resolved at ${totalTicks(lanes.length) * TIMING.tickMs}ms, manifest transitions in at ${manifestOnAt(lanes.length) * TIMING.tickMs}ms`,
-  );
-  check("gate cadence is 500ms", TIMING.gateTicks * TIMING.tickMs === 500);
-  check("lanes are staggered, not simultaneous", gateOnAt(1, 1) > gateOnAt(0, 1));
-  check("within a lane, gates resolve left to right", gateOnAt(0, 2) > gateOnAt(0, 1));
-
-  head("4b  TYPE SCALE ON A 1920px PROJECTOR");
-  const px = (lo: number, vw: number, hi: number) => Math.round(Math.min(Math.max(lo * 16, (vw / 100) * 1920), hi * 16));
-  const scale: [string, number][] = [
-    ["the claim", px(2, 4.4, 3.5)],
-    ["reason headline", px(1.15, 2, 1.75)],
-    ["artifact name", px(1.05, 1.7, 1.45)],
-    ["gate name", px(0.95, 1.45, 1.18)],
-    ["reason code", px(0.72, 1.05, 0.9)],
-  ];
-  console.log("");
-  for (const [k, v] of scale) console.log(`  ${k.padEnd(20)} ${v}px`);
-  check("nothing on the reading path is under 14px", scale.every(([, v]) => v >= 14), scale.map(([, v]) => v).join(", "));
-  check("the claim dominates every other element", scale[0][1] >= 2 * scale[2][1]);
-
-  // The terminal segment and the reason must sit in the same grid column, in
-  // row 1. Explicitly placing only the reason made the auto-placed segments skip
-  // its occupied cells, sending every stop bar into the target column. This is
-  // visible in the HTML and should never have needed a screenshot.
-  console.log("");
-  for (const [i, chunk] of html.split('<div class="lane">').slice(1).entries()) {
-    const cells = [...chunk.matchAll(/class="seg([^"]*)" style="grid-column:(\d+);grid-row:1"/g)].map(
-      (m) => `col${m[2]}=${m[1].trim() || "live"}`,
-    );
-    const from = chunk.match(/class="reason[^"]*" style="--from:(\d+)/);
-    console.log(`  lane ${i}  ${cells.join("  ")}${from ? `   reason from col ${from[1]}` : "   crosses"}`);
-    const term = [...chunk.matchAll(/class="seg[^"]*term[^"]*" style="grid-column:(\d+)/g)].map((m) => m[1]);
-    if (from) {
-      check(`  lane ${i}: the stop and its reason share a column`, term[0] === from[1], `${term[0]} vs ${from[1]}`);
+  for (const u of units) {
+    console.log(`\n  [${u.id}]  ${u.status}`);
+    if (u.underlined.length) console.log(`    spans underlined in the source: ${u.underlined.map((x) => JSON.stringify(x)).join(", ")}`);
+    for (const d of u.diags) {
+      console.log(`      ${d.code}`);
+      console.log(`        at ${d.at}`);
+      console.log(`        ${d.line.slice(0, 96)}`);
     }
   }
+  console.log("");
+  check("three compilations render", units.length === 3, units.map((u) => u.id).join(", "));
+  check("  and they run in the order the argument needs", units.map((u) => u.status).join(",") === "FAILED,FAILED,COMPILED");
+
+  const [one, two, three] = units;
+  check("the seller's phrase alone fails for want of a threshold", one.diags.some((d) => /missing THRESHOLD/.test(d.code)));
+  check("  pointed at an exact span of the seller promise", /seller promise\[\d+\.\.\d+\]/.test(one.diags[0]?.at ?? ""), one.diags[0]?.at ?? "");
+  check("  and that span is underlined in the source", one.underlined.length > 0, one.underlined.join(", "));
+
+  check("the requirement compiles, then fails at evidence", two.status === "FAILED" && two.diags.length === 4);
+  const codes = two.diags.map((d) => d.code);
+  console.log(`\n  four artifacts, four codes: ${codes.join(", ")}`);
+  check("  every artifact produces a different typed error", new Set(codes).size === 4);
+  check("  each against an exact source span or a named policy field", two.diags.every((d) => /\[\d+\.\.\d+\]|policy\./.test(d.at)));
+  check("  and every line states what was found against what was required", two.diags.every((d) => /found .*, required /.test(d.line)));
+
+  check("the protected offer compiles clean", three.status === "COMPILED" && three.diags.length === 0);
+  check("  and reports GUARANTEE COMPILED", /Guarantee compiled/i.test(html));
+
+  head("3  THE WITNESS SPEC, STATED BEFORE ANY MONEY MOVES");
+
+  const wid = html.match(/data-witness-id="(0x[0-9a-f]{64})"/);
+  const wsay = html.match(/class="wsay">([\s\S]*?)<\/p>/);
+  const wfields = [...html.matchAll(/<dt>(falsifier|threshold|required binding|permitted issuer)<\/dt><dd[^>]*>([\s\S]*?)<\/dd>/g)].map(
+    (m) => [m[1], flat(m[2])],
+  );
+  console.log(`\n  ${wsay ? flat(wsay[1]) : "MISSING"}`);
+  for (const [k, v] of wfields) console.log(`    ${k.padEnd(18)} ${v}`);
+  console.log(`    witnessId          ${wid ? wid[1] : "MISSING"}`);
+  check("the spec renders with its witnessId, before the purchase", wid !== null);
+  const flatHtml = flat(html);
   check(
-    "every lane cell is explicitly placed in row 1",
-    (html.match(/grid-row:1/g) ?? []).length >= 20,
-    `${(html.match(/grid-row:1/g) ?? []).length} placed cells`,
+    "  the falsifier is the negation of the claim's opcode",
+    /TIMESTAMP_LT/.test(flatHtml) && /negation of TIMESTAMP_GTE/.test(flatHtml),
+  );
+  check("  the threshold carries its source span", /requirement\[\d+\.\.\d+\]/.test(html));
+  check("  the required binding is stated", wfields.some(([k, v]) => k === "required binding" && v === "PREIMAGE"));
+  check("  the permitted issuer is stated", wfields.some(([k, v]) => k === "permitted issuer" && /^0x[0-9a-fA-F]{40}$/.test(v)));
+  check("  and it is stated before any money moves", /Stated before any money moves/.test(html));
+  check(
+    "  the spec appears before the settlement act in the document",
+    html.indexOf("data-witness-id") < html.indexOf('data-testid="provenance-label"'),
   );
 
-  // A screenshot caught the reason blocks auto-placing into an implicit second
-  // grid row, so each one sat under its own rail and read as belonging to the
-  // lane below. HTML assertions cannot see that. This guards the regression.
-  // IntersectionObserver rejects rem in rootMargin and the throw happens inside a
-  // useEffect, which with no error boundary tears down the whole client tree.
-  // The walkthrough only reads server-rendered HTML, so it cannot see that. This
-  // is the cheapest guard that would have caught it.
-  const tsx = readFileSync(`${ROOT}ui/app/components/XRay.tsx`, "utf8");
-  const margins = [...tsx.matchAll(/rootMargin:\s*[`"']([^`"']*)[`"']/g)].map((m) => m[1]);
-  console.log(`\n  rootMargin literals in the client component: ${margins.map((m) => JSON.stringify(m)).join(", ") || "none"}`);
-  check(
-    "every rootMargin is in px or percent, never rem",
-    margins.every((m) => m.split(/\s+/).every((part) => /^-?\$\{[^}]*\}px$|^-?[\d.]+(px|%)$|^0$/.test(part))),
-    margins.join(" | "),
-  );
-  check("the observer cannot take the page down", /catch\s*{[\s\S]{0,200}setStuck\(true\)/.test(tsx));
+  head("4  THE PAYOFF AT INDEX 187");
 
-  const css = readFileSync(`${ROOT}ui/app/globals.css`, "utf8");
-  const reasonBlock = css.slice(css.indexOf(".reason {"), css.indexOf(".reason.on"));
-  check("the reason is pinned to its own lane row, not auto-placed", /grid-row:\s*1/.test(reasonBlock));
-  check("the terminal segment's rail stops at the stop bar", /\.seg\.term::before/.test(css));
+  const before = html.match(/data-witness-before="(0x[0-9a-f]{64})"/);
+  const after = html.match(/data-witness-after="(0x[0-9a-f]{64})"/);
+  const rows = [...html.matchAll(/class="pff (ok|no)">[\s\S]*?class="fn">([^<]*)<[\s\S]*?class="fsrc (chain|fixture)">([^<]*)<[\s\S]*?class="fv">([\s\S]*?)<\/p>/g)].map(
+    (m) => ({ ok: m[1] === "ok", field: flat(m[2]), src: m[3], srcText: flat(m[4]), values: flat(m[5]) }),
+  );
+  console.log(`\n  before  ${before?.[1]}`);
+  console.log(`  after   ${after?.[1]}`);
+  console.log("");
+  for (const r of rows) console.log(`    ${r.ok ? "PASS" : "FAIL"}  ${r.field.padEnd(30)} ${r.srcText}`);
+  check("the executed proof is checked field by field", rows.length >= 8, `${rows.length} fields`);
+  check("  every field satisfies the spec", rows.every((r) => r.ok));
+  check("the witnessId is identical before and after", before?.[1] === after?.[1], before?.[1] ?? "");
+  check("  and it is the same value the spec carried", wid?.[1] === before?.[1]);
+  const fixtureRows = rows.filter((r) => r.src === "fixture");
+  console.log(`\n  fields read from the fixture on both sides: ${fixtureRows.map((r) => r.field).join(", ") || "none"}`);
+  check("the fixture-read fields are labelled as such on the page", fixtureRows.length > 0, fixtureRows.map((r) => r.srcText).join("; "));
+  check(
+    "  and the page says why rather than implying they were recomputed",
+    /the chain does not carry this as a string|does not carry them\s*as a string/.test(flat(html)),
+  );
 
   head("5  THE MANIFEST, EACH LITERAL LINKED TO ITS SOURCE SPAN");
   const src = html.match(/class="src-line"[^>]*>([\s\S]*?)<\/p>/);
@@ -343,7 +314,7 @@ const first = await serve(async (html) => {
   );
   check("the four-opcode vocabulary shown as a closed set", ops.length === 4);
 
-  return { lanes, claimText };
+  return { units, claimText };
 });
 
 // ------------------------------------------------------------------ 7
@@ -354,7 +325,8 @@ await serve(async (html, port) => {
   const at = (needle: string) => html.indexOf(needle);
   const beats: [string, number][] = [
     ["the claim, stated", at('class="claim-quote"')],
-    ["the x-ray board", at('class="xray-board"')],
+    ["the compile surface", at('class="compiler"')],
+    ["the witness spec", at("data-witness-id")],
     ["the protection manifest", at('class="mf-grid"')],
     ["the refusal", at('class="refusal-term"')],
     ["evidence screening, on chain", at("ClaimTypeMismatch")],
@@ -405,7 +377,11 @@ await serve(async (html, port) => {
   const cold = await fetch(probeUrl).then((r) => r.json());
   console.log(`\n  probe with no chain:  available=${cold.available}  reasons=${(cold.reasons ?? []).join("; ")}`);
   check("the capability probe answers", typeof cold.available === "boolean");
-  check("  with no chain it refuses and says why", cold.available === false && cold.reasons.length > 0);
+  if (cold.available) {
+    skip("  with no chain it refuses and says why", "a chain is already reachable in this environment");
+  } else {
+    check("  with no chain it refuses and says why", cold.reasons.length > 0);
+  }
 
   const anvil = spawn(`${process.env.HOME}/.foundry/bin/anvil`, ["--host", "127.0.0.1", "--port", "8545", "--silent"], {
     stdio: "ignore",
@@ -536,9 +512,10 @@ await serve(async (html, port) => {
 head("9  CHANGING A FIXTURE CHANGES THE SCREEN");
 
 const before = readFileSync(FIXTURE, "utf8");
-const laneBefore = first.lanes[1];
-console.log(`\n  lane 1 now:    ${laneBefore.name}   stops at gate ${reach(laneBefore)}   ${laneBefore.code}`);
-console.log(`                 "${laneBefore.headline}"`);
+const diagOf = (us: { diags: { code: string; line: string }[] }[], artifact: string) =>
+  us.flatMap((u) => u.diags).find((d) => d.line.includes(artifact));
+const codeBefore = diagOf(first.units, "coingecko-markets-last_updated")?.code ?? "?";
+console.log(`\n  last_updated diagnostic now:   ${codeBefore}`);
 console.log(`\n  edit  agent/src/fixtures/evidence.ts   LAST_UPDATED.measured.effectiveSubject`);
 console.log(`        "RESPONSE"  ->  "RECORD"     (as if the 400-record measurement had come out differently)`);
 
@@ -552,23 +529,16 @@ writeFileSync(FIXTURE, before.replace(NEEDLE, 'effectiveSubject: "RECORD",'));
 try {
   build();
   await serve(async (html) => {
-    const lanes = readLanes(html);
-    if (lanes.length < 2) {
-      writeFileSync("/tmp/walkthrough-mutated.html", html);
-      console.log(`\n  fetched ${html.length} bytes, ${lanes.length} lane(s). Board present: ${html.includes("xray-board")}`);
-      console.log(`  dumped to /tmp/walkthrough-mutated.html`);
-      check("the mutated build served the board", false, `${lanes.length} lanes`);
-      return;
-    }
-    const l = lanes[1];
-    console.log(`\n  lane 1 after:  ${l.name}   stops at gate ${reach(l)}   ${l.code}`);
-    console.log(`                 "${l.headline}"`);
-    const g1 = lanes.filter((x) => !crosses(x) && reach(x) === 1).length;
-    const g2 = lanes.filter((x) => !crosses(x) && reach(x) === 2).length;
-    console.log(`\n  gate occupancy moved: gate 1 now carries ${g1} lane(s), gate 2 carries ${g2}`);
-    check("the rendered reason code changed", l.code !== laneBefore.code, `${laneBefore.code}  ->  ${l.code}`);
-    check("the rendered headline changed", l.headline !== laneBefore.headline, `"${l.headline}"`);
-    check("the lane now stops at a different gate", reach(l) !== reach(laneBefore), `${reach(laneBefore)} -> ${reach(l)}`);
+    const us = [...html.matchAll(/data-compilation="([^"]+)"[\s\S]*?(?=<section class="unit|<section class="shell)/g)].map((m) => ({
+      diags: [...m[0].matchAll(/class="dcode">([^<]*)<[\s\S]*?class="dline">([\s\S]*?)<\/p>/g)].map((d) => ({
+        code: flat(d[1]),
+        line: flat(d[2]),
+      })),
+    }));
+    const codeAfter = diagOf(us, "coingecko-markets-last_updated")?.code ?? "?";
+    console.log(`\n  last_updated diagnostic after: ${codeAfter}`);
+    check("the rendered diagnostic code changed", codeAfter !== codeBefore, `${codeBefore}  ->  ${codeAfter}`);
+    check("  and it is still a typed error, not prose", /^[A-Z_]+$/.test(codeAfter.split(" ")[0]), codeAfter);
     check("no component file was touched to make that happen", true, "the component renders the view and nothing else");
   });
 } finally {

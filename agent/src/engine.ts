@@ -53,15 +53,15 @@ export const AMOUNT = BigInt(PROTECTED_PRICE_MICROS);
 export const RECORD_COUNT = 500;
 export const CHALLENGE_WINDOW = 30n;
 export const CURE_PERIOD = 20n;
-const FRESH_BY = 90n;
+const FRESH_BY = 20n; // inside a 60 second window
 const STALE_BY = 26n * 3600n;
 const STALE_ONSET = 187;
 const MIXED_AGES = partiallyStale(FRESH_BY, STALE_BY, STALE_ONSET);
 const DELIVERY_GRACE = 600n;
-const FRESHNESS_TERM = "every record generated within the last 1 hour";
+const FRESHNESS_TERM = "every record generated within the last 60 seconds";
 const ROW_COUNT_TERM = "at least 500 records";
 const UNPROTECTABLE_TERM = "high quality investment reports";
-const NAIVE_WINDOW = 3600n;
+const NAIVE_WINDOW = 60n;
 
 const ESCROW_ABI = escrowArtifact().abi as Abi;
 const USDC_ABI = usdcArtifact().abi as Abi;
@@ -470,7 +470,7 @@ async function runRelease(): Promise<RunArtifact["release"]> {
     accounts.seller,
   );
 
-  const records = buildDelivery(RECORD_COUNT, now, 120n);
+  const records = buildDelivery(RECORD_COUNT, now, 20n);
   const tree = commitTo(records);
   await commitAll(terms, specHash, tree.root, tree.leafCount, payloadRefOf(records));
 

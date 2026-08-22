@@ -2,11 +2,11 @@
   "meta": {
     "chainId": 31337,
     "rpc": "http://127.0.0.1:8545",
-    "capturedAt": "2026-08-22T05:53:57.953Z",
-    "chainTime": "1787378110",
-    "blockNumber": "23",
-    "escrow": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
-    "usdc": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+    "capturedAt": "2026-08-22T22:37:34.121Z",
+    "chainTime": "1787438327",
+    "blockNumber": "31",
+    "escrow": "0xdc64a140aa3e981100a9beca4e685f962f0cf6c9",
+    "usdc": "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9",
     "accounts": {
       "buyer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "seller": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
@@ -32,7 +32,7 @@
       {
         "name": "file hash matches timestamp",
         "passed": true,
-        "detail": "0xf9a8c92c1b4b6438..."
+        "detail": "0xf86dba436b4be560..."
       },
       {
         "name": "signed blob timestamp authentic",
@@ -42,56 +42,56 @@
       {
         "name": "blob timestamp inside window",
         "passed": true,
-        "detail": "file existed 0s ago, window is 3600s"
+        "detail": "file existed 0s ago, window is 60s"
       }
     ],
     "allPassed": true,
     "payment": {
       "amount": "10000",
       "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-      "txHash": "0xbf9139ca535b950159eb46258ef7b8643409d10c19521b4fafb5630fc6bebbc0",
-      "blockNumber": "5"
+      "txHash": "0x2e4b716c4abf95dfb0ed34dec1f934380a621bbcc249a5bdf8fada0cd27cc6ba",
+      "blockNumber": "13"
     },
     "blobTimestamp": {
-      "at": "1787378037",
+      "at": "1787438253",
       "issuer": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
-      "blobHash": "0xf9a8c92c1b4b643840435fca85e13ef38993f52ac7f9eaf90808eece21261ed6"
+      "blobHash": "0xf86dba436b4be56020a8475f13ad171fa3c4c47811890437703702f0de9e168b"
     },
     "reveal": {
-      "windowSeconds": "3600",
+      "windowSeconds": "60",
       "staleCount": 251,
       "freshCount": 249,
       "firstStaleIndex": 187,
       "oldestAgeSeconds": "93600",
-      "newestAgeSeconds": "90",
+      "newestAgeSeconds": "20",
       "samples": [
         {
           "index": 0,
-          "generatedAt": "1787377947",
-          "ageSeconds": "90",
+          "generatedAt": "1787438233",
+          "ageSeconds": "20",
           "stale": false
         },
         {
           "index": 186,
-          "generatedAt": "1787377947",
-          "ageSeconds": "90",
+          "generatedAt": "1787438233",
+          "ageSeconds": "20",
           "stale": false
         },
         {
           "index": 187,
-          "generatedAt": "1787284437",
+          "generatedAt": "1787344653",
           "ageSeconds": "93600",
           "stale": true
         },
         {
           "index": 188,
-          "generatedAt": "1787284437",
+          "generatedAt": "1787344653",
           "ageSeconds": "93600",
           "stale": true
         },
         {
           "index": 499,
-          "generatedAt": "1787284437",
+          "generatedAt": "1787344653",
           "ageSeconds": "93600",
           "stale": true
         }
@@ -99,20 +99,20 @@
     }
   },
   "protectedPurchase": {
-    "specHash": "0xbe5adb671db9bc6cc3f2b97ce984e188b9f38433a3a9cdacb9e07c2e7f5737ee",
+    "specHash": "0x6e107421eacc2330a0c08006aaed7775567ed1e592c4f5a6344b63bd0340924a",
     "amount": "10000",
     "challengeWindowSeconds": "30",
     "curePeriodSeconds": "20",
-    "deliveryDeadline": "1787378637",
+    "deliveryDeadline": "1787438854",
     "conditions": [
       {
         "conditionId": 1,
-        "sourceQuote": "every record generated within the last 1 hour",
-        "ruleId": "record-freshness-hours",
+        "sourceQuote": "every record generated within the last 60 seconds",
+        "ruleId": "record-freshness-seconds",
         "claimType": "RECORD_GENERATION_TIME",
         "quantifier": "UNIVERSAL",
         "opcode": "TIMESTAMP_GTE",
-        "threshold": "1787374437",
+        "threshold": "1787438194",
         "thresholdKind": "timestamp",
         "permittedIssuer": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
         "expectedSourceId": "0xc53fef9f35628ff5bf2cd4cc96a259445f5e327e5cb0d4c121b014281aa142b7",
@@ -143,16 +143,16 @@
       "whyRejected": "A signed timestamp over the delivered file establishes when the file existed. It says nothing about when the records inside it were generated.",
       "escrowBalanceAfter": "0"
     },
-    "openTx": "0x93e4465b8150638e293c89e934589225767ceb8921b9d38f2074542c9e14cd53",
+    "openTx": "0x73b03ec4e0cb413d6e013cb58b7fb8ae954e125e94d99f42bb23f3166cf9e4c2",
     "commitment": {
-      "merkleRoot": "0xa37613826c069d30ec9dd3a8675cf05332b62a4650690ab2e98a15f544bd331a",
+      "merkleRoot": "0x84a7fb052e422e688545b555543709bb5cac9e7a11b0a8f2398aaee9ccf44581",
       "leafCount": "500",
       "sourceId": "0xc53fef9f35628ff5bf2cd4cc96a259445f5e327e5cb0d4c121b014281aa142b7",
-      "payloadRef": "0xf9a8c92c1b4b643840435fca85e13ef38993f52ac7f9eaf90808eece21261ed6",
+      "payloadRef": "0x0e2d2c8111746a0cbe390e6ce46322d73550bdc017eb51597be231f96811040d",
       "issuer": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
       "txHashes": [
-        "0xc3290513f77e0d2dad20e867cc0fc347bf6248aecd5cb437fe34cd120af1705a",
-        "0xb3eee140c95c2b3f11c8ceba96209abbd6cab592152bc992c191a7022edc04a3"
+        "0xc514f603feeef7ec81cf650c7701965be8a4e8f79479cdbe7ac0f41c80d45795",
+        "0xc4eedca3b75a8732fbe5e25d7fef98a5929b87ad2e93e8d46af679c0815dd494"
       ],
       "leafFormula": "keccak256(abi.encode(index, keccak256(recordBytes), generatedAt, sourceId))"
     },
@@ -160,9 +160,9 @@
       "totalRecords": 500,
       "violations": 251,
       "firstViolationIndex": 187,
-      "observedAt": "1787284437",
-      "thresholdAt": "1787374437",
-      "shortBySeconds": "90000",
+      "observedAt": "1787344654",
+      "thresholdAt": "1787438194",
+      "shortBySeconds": "93540",
       "scalar": {
         "conditionId": 2,
         "observed": "500",
@@ -214,24 +214,24 @@
       {
         "step": 8,
         "label": "Predicate violated",
-        "detail": "generation time is 90000 seconds short of the threshold"
+        "detail": "generation time is 93540 seconds short of the threshold"
       }
     ],
     "settlement": {
       "verdict": "BREACH_PROVED",
       "refundAmount": "10000",
       "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-      "txHash": "0xd72872a3aae87834eac57f3dbd7d637c6a83207f98b86ac25742641c2b8586a0",
-      "blockNumber": "9",
+      "txHash": "0x759e5e0761df769a5acc1924890a86bab17e19516727a4c518e07d7beefbec4b",
+      "blockNumber": "17",
       "offendingIndex": "187",
       "escrowBalanceAfter": "0"
     }
   },
   "release": {
-    "specHash": "0xf3aa4f6f4ee8942a582ca58fa2992169103e9075353caf9cbb7d45b9de82bee8",
+    "specHash": "0xcaac00e8bd17b3154dd1530d0f15f0e868c12c4ddfc76702e3d6edbe1e0bfb3d",
     "amount": "10000",
     "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-    "txHash": "0x94fee804e0f6fd1a6b746584666a9101b36cde2b905a16baa6916ee4e062b091",
+    "txHash": "0x18bde1a35b981d0630923bdfff98929f83fa7afa90696394d469874800273aec",
     "violations": 0,
     "scalarObserved": "500",
     "scalarThreshold": "500",
@@ -244,6 +244,7 @@
       "row-count-at-least",
       "row-count-exactly",
       "record-freshness-hours",
+      "record-freshness-seconds",
       "record-freshness-minutes"
     ],
     "opcodes": [
@@ -255,21 +256,21 @@
     "escrowOpened": false
   },
   "stalled": {
-    "specHash": "0x127f9b7ca57c081ed7e59dee57e8e942b0d6aef57fcbac2af35c222a4260279e",
+    "specHash": "0x464f031650159a4f206e9b491fbd865ce7cf6ca1724cd971d4d529cfbbd12224",
     "amount": "10000",
     "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-    "txHash": "0x1c494565de39c8c854760faf673c83ff2ba9add30cae8995fe3491346b1c7ab8",
+    "txHash": "0xf2a7ddf24640452367ee2b7a946fbe76a868434e4e680713f330117810b8b73c",
     "committed": 0,
     "required": 2,
-    "deadline": "1787378088",
+    "deadline": "1787438305",
     "earlyReclaimError": "DeliveryDeadlineNotReached"
   },
   "withheld": {
-    "specHash": "0x0485462f4732b2562aaca44bbf4bf26708ab6d5d895ae53709f3493f0389c512",
+    "specHash": "0x85f1e1da3fb93208ce009ba7fbcc19f823d515479a5993868649b7085fbfe051",
     "amount": "10000",
     "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-    "txHash": "0xc4e2e6424de32161abf73e135dc974d3e4ae92296219e70816ec61d253a56d97",
-    "payloadRef": "0x8dc7f7390874fc83a8c0e78afcdb0f186c4eace8460a53f8f23fe26e1eb95055",
+    "txHash": "0x88b68579b9c1063d11cbb258f8d59c0b85065cab3f32d40d7d7466e0291e6a6c",
+    "payloadRef": "0x954e3fe38f79f24ab0a5427fae9d1c5729126549a3b7da41e01c39e430cd7685",
     "challengedIndex": "42",
     "curePeriodSeconds": "20",
     "answered": false,
