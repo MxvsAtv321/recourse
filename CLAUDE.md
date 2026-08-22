@@ -5,7 +5,8 @@ promises enforceable at settlement.
 
 NTU InnovateX 2026, Track 1. Stage 1 due 14 Aug, submit 10:00 EDT.
 
-Full data shapes: `spec/SPEC.md`. Path-scoped detail: `.claude/rules/recourse-invariants.md`.
+Full data shapes: `spec/SPEC.md`. Evidence type system: `spec/EVIDENCE.md`.
+Path-scoped detail: `.claude/rules/recourse-invariants.md`.
 The rules below are here rather than there because root CLAUDE.md is re-injected after
 compaction and path-scoped rules are not.
 
@@ -16,6 +17,15 @@ compaction and path-scoped rules are not.
 Escrow that checks the goods before releasing the money. Settlement is optimistic: funds
 release after a challenge window unless someone submits a cryptographic proof that the
 delivery broke an objective promise. One counterexample refunds the buyer. No arbiter.
+
+Three acts. INSPECT takes a commercial claim and the evidence artifacts that actually exist,
+and says which can establish the claim, which cannot, and at exactly which gate each one
+fails. PROTECT takes a buyer requirement carrying an explicit threshold and emits a
+Protection Manifest, or refuses and names the missing dimensions. ENFORCE is the escrow, the
+predicate evaluator and the Merkle breach verifier, and it is frozen.
+
+INSPECT and PROTECT sit entirely above ENFORCE. They add no Solidity, no on-chain call and no
+new opcode.
 
 ## Positioning, which constrains the build
 
@@ -45,11 +55,30 @@ occupy this space.
    It never grows to fit a term. Unexpressible terms are UNPROTECTABLE.
 7. **UNPROTECTABLE is a normal outcome**, not an error.
 8. **A breach proof that fails any check reverts.** There is no partial success.
+9. **A model may classify and extract. It may never invent a contractual value.** Every
+   threshold, quantifier, issuer and identifier in a Protection Manifest is a `Sourced<T>`
+   carrying either an exact span of the buyer requirement or seller offer, or a named policy
+   field. There is no constructor that takes a bare value. If provenance cannot be produced,
+   the field is not written and the manifest abstains.
+10. **A vague term reports which dimensions are missing. It never proposes a value for them.**
+    `REFUSED` with a `missing` list is a normal outcome, like `UNPROTECTABLE`.
+11. **A relative threshold resolves against a clock the obligor does not control.** Agreement
+    time, frozen into the signed terms, or chain time. Never a field in the delivery.
+    Measured 2026-08-22: AIsa's `last_fetch_at` drifted between 10 and 149 seconds behind the
+    request across four calls, flipping the sign of a computed record age on 93 records in one
+    call and 22 in another.
+12. **A declared scope is disproved only by measurement.** An `Artifact` without a
+    `Resolution` is one whose schema is being trusted, unless its binding is `PREIMAGE` over a
+    per-record index, which makes per-record scope structural. Say so on the surface rather
+    than implying the field was checked.
 
 ## Hard scope
 
 `contracts/` holds exactly three things: one escrow, one predicate evaluator, one Merkle
 breach verifier.
+
+`contracts/` is frozen. INSPECT and PROTECT are TypeScript above it. Any proposal that
+requires a Solidity change is out of scope by definition, not by budget.
 
 No on-chain strings. No on-chain JSON. No dynamic interpretation. No general VM. No ZK.
 No oracle network. No verifier registry.
