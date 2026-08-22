@@ -1386,3 +1386,23 @@ details[open] .chev {
 @media (max-width: 760px) {
   .claim-sticky .q { font-size: 0.95rem; }
 }
+
+/* the terms the escrow was opened under, stated once before the settlement act */
+.enforce-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 clamp(1.5rem, 4vw, 3.5rem);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1.6rem;
+  padding: 0.9rem 0;
+}
+.enforce-terms .row { border: 0; padding: 0; display: flex; gap: 0.6rem; align-items: baseline; }
+.enforce-terms dt {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.enforce-terms dd { margin: 0; font-weight: 600; color: var(--ink); }

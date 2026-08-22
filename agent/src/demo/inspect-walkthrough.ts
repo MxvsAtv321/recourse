@@ -80,13 +80,35 @@ function build(): string {
   return r.stdout;
 }
 
-async function serve<T>(fn: (html: string) => T | Promise<T>): Promise<T> {
-  // Spawn the binary directly and in its own process group. Going through npx
-  // leaves the real next process alive when the wrapper is killed, and the next
-  // phase then fetches a server built from the previous fixture.
-  // A fresh port per phase. If a previous next process outlives its kill, the
-  // next phase must not be able to reach it and read a stale build.
-  const port = ++PORT;
+const answers = async (port: number) =>
+  fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(400) }).then(
+    () => true,
+    () => false,
+  );
+
+/** Kill whatever is listening on a port. Next detaches its server from the shim. */
+function releasePort(port: number) {
+  const pids = spawnSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"], { encoding: "utf8" })
+    .stdout.split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  for (const pid of pids) spawnSync("kill", ["-9", pid]);
+}
+
+async function serve<T>(fn: (html: string, port: number) => T | Promise<T>): Promise<T> {
+  // Bind a port that is genuinely free. next start does not fail loudly when the
+  // port is taken, so without this a phase silently reads a server left over
+  // from an earlier run, serving an earlier build. That produced a false
+  // negative once and it was not obvious.
+  let port = 0;
+  for (let p = ++PORT; p < PORT + 40; p++) {
+    if (!(await answers(p))) {
+      port = p;
+      PORT = p;
+      break;
+    }
+  }
+  if (!port) throw new Error("no free port in range");
   const srv = spawn(`${ROOT}ui/node_modules/.bin/next`, ["start", "-p", String(port)], {
     cwd: `${ROOT}ui`,
     stdio: "ignore",
@@ -97,7 +119,7 @@ async function serve<T>(fn: (html: string) => T | Promise<T>): Promise<T> {
     for (let i = 0; i < 80; i++) {
       await new Promise((r) => setTimeout(r, 250));
       try {
-        const res = await fetch(`http://127.0.0.1:${port}/inspect`);
+        const res = await fetch(`http://127.0.0.1:${port}/`);
         if (res.ok) {
           html = await res.text();
           break;
@@ -107,21 +129,19 @@ async function serve<T>(fn: (html: string) => T | Promise<T>): Promise<T> {
       }
     }
     if (!html) throw new Error("server never answered");
-    return await fn(html);
+    return await fn(html, port);
   } finally {
     try {
       if (srv.pid) process.kill(-srv.pid, "SIGKILL");
     } catch {
       srv.kill("SIGKILL");
     }
-    // Do not return until the port is actually free.
-    for (let i = 0; i < 40; i++) {
-      try {
-        await fetch(`http://127.0.0.1:${port}/inspect`, { signal: AbortSignal.timeout(200) });
-      } catch {
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 150));
+    // Do not return until the port is actually free, and take the listener down
+    // by pid if the process group kill did not reach it.
+    for (let i = 0; i < 20; i++) {
+      if (!(await answers(port))) break;
+      if (i === 4) releasePort(port);
+      await new Promise((r) => setTimeout(r, 200));
     }
   }
 }
@@ -312,7 +332,95 @@ const first = await serve(async (html) => {
 
 // ------------------------------------------------------------------ 7
 
-head("7  CHANGING A FIXTURE CHANGES THE SCREEN");
+head("7  ONE CONTINUOUS PAGE: INSPECT, PROTECT, ENFORCE");
+
+await serve(async (html, port) => {
+  const at = (needle: string) => html.indexOf(needle);
+  const beats: [string, number][] = [
+    ["the claim, stated", at('class="claim-quote"')],
+    ["the x-ray board", at('class="xray-board"')],
+    ["the protection manifest", at('class="mf-grid"')],
+    ["the refusal", at('class="refusal-term"')],
+    ["evidence screening, on chain", at("ClaimTypeMismatch")],
+    ["on-chain verification", at('data-testid="provenance-label"')],
+    ["the refund panel", at('data-testid="refund-panel"')],
+    ["the refund transaction", at('data-testid="refund-tx"')],
+  ];
+  console.log("");
+  for (const [label, i] of beats) console.log(`  ${String(i).padStart(7)}  ${label}`);
+  check("every beat is present", beats.every(([, i]) => i > 0), beats.filter(([, i]) => i < 0).map(([l]) => l).join(", "));
+  check(
+    "and they appear in one top-to-bottom order",
+    beats.every(([, i], k) => k === 0 || i > beats[k - 1][1]),
+  );
+
+  const acts = [...html.matchAll(/data-act="(INSPECT|PROTECT|ENFORCE)"/g)].map((m) => m[1]);
+  console.log(`\n  acts in document order: ${[...new Set(acts)].join(" -> ")}`);
+  check("INSPECT precedes ENFORCE", acts.indexOf("INSPECT") < acts.indexOf("ENFORCE"));
+  check("no page transition between them", !/<a [^>]*href="\/(inspect|enforce|protect)/.test(html), "no in-page links between acts");
+
+  // The old layout numbered its sections 01..06. Anything still numbered is a
+  // section that was never folded into an act.
+  const stale = [...html.matchAll(/data-step="(0[1-6])"/g)].map((m) => m[1]);
+  check("no dead numbered sections from the old layout", stale.length === 0, stale.join(", ") || "none");
+  check("exactly one Protect & Pay control", (html.match(/data-testid="protect-and-pay"/g) ?? []).length <= 1);
+
+  const tx = html.match(/title="(0x[0-9a-fA-F]{64})"[^>]*data-testid="refund-tx"/);
+  console.log(`\n  refund transaction: ${tx ? tx[1] : "MISSING"}`);
+  check("the refund panel carries a real transaction hash", tx !== null, tx ? tx[1] : "");
+  const verdict = html.match(/class="verdict-tag">([\s\S]*?)<\/span>/);
+  console.log(`  verdict: ${verdict ? flat(verdict[1]) : "?"}`);
+  check("  and the verdict is the one the escrow emitted", /BREACH PROVED|BREACH_PROVED/.test(html));
+
+  head("7b  THE LIVE PATH AND THE CAPTURED FALLBACK");
+  const phase = html.match(/data-phase="([a-z]+)"/);
+  const source = html.match(/data-trace-source="([a-z]+)"/);
+  const label = html.match(/data-testid="provenance-label"[^>]*>([^<]*)</);
+  console.log(`\n  server-rendered phase: ${phase?.[1]}   trace source: ${source?.[1]}   badge: ${label?.[1]?.trim()}`);
+  check("the server renders the captured fallback, never a control that cannot work",
+    phase?.[1] === "captured" && source?.[1] === "captured");
+  check("  and it is badged CAPTURED VERIFIED RUN", (label?.[1] ?? "").trim() === "Captured verified run");
+  check("  so no run button is in the HTML when no chain is reachable",
+    !html.includes('data-testid="protect-and-pay"'));
+
+  // The Protect & Pay control is a client-side upgrade: it renders only after
+  // this probe says a chain is reachable. That is why it is absent above.
+  const probeUrl = `http://127.0.0.1:${port}/api/demo/breach`;
+  const cold = await fetch(probeUrl).then((r) => r.json());
+  console.log(`\n  probe with no chain:  available=${cold.available}  reasons=${(cold.reasons ?? []).join("; ")}`);
+  check("the capability probe answers", typeof cold.available === "boolean");
+  check("  with no chain it refuses and says why", cold.available === false && cold.reasons.length > 0);
+
+  const anvil = spawn(`${process.env.HOME}/.foundry/bin/anvil`, ["--host", "127.0.0.1", "--port", "8545", "--silent"], {
+    stdio: "ignore",
+    detached: true,
+  });
+  try {
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+      const ok = await fetch("http://127.0.0.1:8545", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
+      })
+        .then(() => true)
+        .catch(() => false);
+      if (ok) break;
+    }
+    const warm = await fetch(probeUrl).then((r) => r.json());
+    console.log(`  probe with anvil up:  available=${warm.available}  chainId=${warm.chainId}`);
+    check("  with a chain up it offers live execution", warm.available === true, `chain ${warm.chainId}`);
+    console.log("  so the client swaps the captured badge for LIVE LOCAL EXECUTION and renders Protect & Pay");
+  } finally {
+    try {
+      if (anvil.pid) process.kill(-anvil.pid, "SIGKILL");
+    } catch {
+      anvil.kill("SIGKILL");
+    }
+  }
+});
+
+head("8  CHANGING A FIXTURE CHANGES THE SCREEN");
 
 const before = readFileSync(FIXTURE, "utf8");
 const laneBefore = first.lanes[1];
@@ -332,6 +440,13 @@ try {
   build();
   await serve(async (html) => {
     const lanes = readLanes(html);
+    if (lanes.length < 2) {
+      writeFileSync("/tmp/walkthrough-mutated.html", html);
+      console.log(`\n  fetched ${html.length} bytes, ${lanes.length} lane(s). Board present: ${html.includes("xray-board")}`);
+      console.log(`  dumped to /tmp/walkthrough-mutated.html`);
+      check("the mutated build served the board", false, `${lanes.length} lanes`);
+      return;
+    }
     const l = lanes[1];
     console.log(`\n  lane 1 after:  ${l.name}   stops at gate ${reach(l)}   ${l.code}`);
     console.log(`                 "${l.headline}"`);
