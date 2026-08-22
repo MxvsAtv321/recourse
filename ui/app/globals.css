@@ -33,6 +33,9 @@
 
   --gutter: clamp(1.25rem, 5vw, 4rem);
   --measure: 68ch;
+
+  /* the masthead is sticky at 0, so anything else that sticks must clear it */
+  --masthead-h: 3.6rem;
 }
 
 html {
@@ -310,7 +313,7 @@ p {
 
 .check {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto max-content 1fr;
   align-items: baseline;
   gap: 0.85rem;
   padding: 0.85rem clamp(1.4rem, 3vw, 2.1rem);
@@ -353,6 +356,7 @@ p {
 .check-name {
   font-weight: 500;
   min-width: 0;
+  white-space: nowrap;
 }
 
 .check-detail {
@@ -360,7 +364,7 @@ p {
   font-size: 0.86rem;
   text-align: right;
   min-width: 0;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 @media (max-width: 560px) {
@@ -1356,7 +1360,7 @@ details[open] .chev {
 /* --- the claim, condensed, held at the top of the board while lanes resolve --- */
 .claim-sticky {
   position: sticky;
-  top: 0;
+  top: var(--masthead-h, 3.4rem);
   z-index: 6;
   display: flex;
   flex-wrap: wrap;
@@ -1406,3 +1410,21 @@ details[open] .chev {
   color: var(--ink-3);
 }
 .enforce-terms dd { margin: 0; font-weight: 600; color: var(--ink); }
+
+/* A revert selector, shown as the contract spells it. Uppercasing ClaimTypeMismatch
+   produces CLAIMTYPEMISMATCH, which nobody can read at a glance. */
+.badge.code {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-weight: 500;
+}
+
+/* The condensed claim only earns its space once the dark claim field has gone.
+   Before that it is a second copy of the sentence directly under the first. */
+.claim-sticky {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+.claim-sticky.stuck { opacity: 1; }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   TIMING,
   gateOnAt,
@@ -22,6 +22,21 @@ export function XRay({ view }: { view: XRayView }) {
   const [tick, setTick] = useState(0);
   const [run, setRun] = useState(0);
 
+  // The dark claim field sits directly above the board and states the same
+  // sentence, so the condensed copy is redundant until it is actually stuck.
+  const stickyRef = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const el = stickyRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setStuck(e.intersectionRatio < 1), {
+      threshold: [1],
+      rootMargin: "-3.7rem 0px 0px 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   useEffect(() => {
     const reduce =
       typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -37,7 +52,7 @@ export function XRay({ view }: { view: XRayView }) {
   return (
     <>
       <div className="xray">
-        <div className="claim-sticky">
+        <div className={stuck ? "claim-sticky stuck" : "claim-sticky"} ref={stickyRef}>
           <span className="q">&ldquo;{view.claim.quote}&rdquo;</span>
           <span className="m">
             {view.claim.subject} &middot; {view.claim.property.replace(/_/g, " ")} &middot;{" "}

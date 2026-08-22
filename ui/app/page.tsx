@@ -219,7 +219,7 @@ export default function Page() {
             <div className="card">
               <div className="card-head">
                 <span className="card-title">Condition {run.protectedPurchase.rejectedOffer.conditionId} · offer rejected</span>
-                <span className="badge warn">{run.protectedPurchase.rejectedOffer.error}</span>
+                <span className="badge warn code">{run.protectedPurchase.rejectedOffer.error}</span>
               </div>
               <div className="card-pad">
                 <p style={{ maxWidth: "60ch" }}>
