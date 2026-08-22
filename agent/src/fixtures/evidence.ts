@@ -13,6 +13,17 @@ import type { Artifact } from "../evidence.js";
 
 export const OBSERVED_WINDOW = "2026-08-22T01:03:30Z to 2026-08-22T01:51:22Z";
 
+/**
+ * The upstream source of record, as an address. This is the same account the
+ * ENFORCE demo signs delivery commitments with (agent/src/chain.ts accounts.upstream),
+ * so the address the manifest shows is the address the escrow checks.
+ */
+export const PERMITTED_ISSUER = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
+/** accounts.seller. The party whose performance is in question. */
+export const OBLIGOR = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
+/** accounts.rogue. A key the terms do not name. */
+export const STRANGER = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65";
+
 // ------------------------------------------------------------------ the five measured artifacts
 
 export const X402_RECEIPT: Artifact = {
@@ -87,7 +98,7 @@ export const RECOURSE_COMMITMENT: Artifact = {
   subject: "RECORD",
   property: "GENERATION_TIME",
   binding: "PREIMAGE",
-  attestation: { kind: "SIGNED", issuer: "condition.permittedIssuer", scheme: "EIP712" },
+  attestation: { kind: "SIGNED", issuer: PERMITTED_ISSUER, scheme: "EIP712" },
 };
 
 /** The five lanes of the X-Ray, in spec order. */
@@ -112,7 +123,7 @@ export const BLOB_TIMESTAMP: Artifact = {
   subject: "RESPONSE",
   property: "EXISTENCE_TIME",
   binding: "PREIMAGE",
-  attestation: { kind: "SIGNED", issuer: "condition.permittedIssuer", scheme: "EIP712" },
+  attestation: { kind: "SIGNED", issuer: PERMITTED_ISSUER, scheme: "EIP712" },
 };
 
 /** The precedence witness: same shape as is_stale, no observed counterexample. */
@@ -139,22 +150,20 @@ export const LEAF_COUNT: Artifact = {
   subject: "RESPONSE",
   property: "CARDINALITY",
   binding: "ADJACENT",
-  attestation: { kind: "SIGNED", issuer: "condition.permittedIssuer", scheme: "EIP712" },
+  attestation: { kind: "SIGNED", issuer: PERMITTED_ISSUER, scheme: "EIP712" },
 };
 
 /** Same commitment, signed by a key the terms do not name. */
 export const COMMITMENT_STRANGER_KEY: Artifact = {
   ...RECOURSE_COMMITMENT,
   id: "recourse-delivery-commitment (stranger key)",
-  attestation: { kind: "SIGNED", issuer: "0xStranger", scheme: "EIP712" },
+  attestation: { kind: "SIGNED", issuer: STRANGER, scheme: "EIP712" },
 };
 
 /** Same commitment, signed by the seller, who cannot attest to its own performance. */
 export const COMMITMENT_SELLER_SIGNED: Artifact = {
   ...RECOURSE_COMMITMENT,
   id: "recourse-delivery-commitment (seller signed)",
-  attestation: { kind: "SIGNED", issuer: "0xSeller", scheme: "EIP712" },
+  attestation: { kind: "SIGNED", issuer: OBLIGOR, scheme: "EIP712" },
 };
 
-export const PERMITTED_ISSUER = "condition.permittedIssuer";
-export const OBLIGOR = "0xSeller";

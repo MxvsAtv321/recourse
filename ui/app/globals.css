@@ -976,3 +976,413 @@ details[open] .chev {
   gap: 1rem;
   max-width: var(--measure);
 }
+
+/* ================================================================ INSPECT: the evidence X-Ray
+   Additive. Nothing above this line is modified. */
+
+.xray-page { padding-bottom: 5rem; }
+
+/* --- the claim, stated once, as a dark field. The target rail repeats it. --- */
+.claim-field {
+  background: var(--ink);
+  color: var(--paper);
+  padding: clamp(2rem, 4vw, 3.25rem) 0;
+}
+.claim-field .eyebrow { color: rgba(245, 243, 238, 0.5); }
+.claim-quote {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(2rem, 4.4vw, 3.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  margin: 0.6rem 0 0;
+  max-width: 24ch;
+}
+.claim-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2.5rem;
+  margin-top: 1.6rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(245, 243, 238, 0.62);
+}
+.claim-meta b { color: var(--paper); font-weight: 500; }
+
+/* --- the board --- */
+.xray {
+  --name-col: clamp(9rem, 14.5vw, 13.5rem);
+  --target-col: clamp(5.5rem, 8vw, 8rem);
+  --gate-pad: clamp(0.8rem, 1.6vw, 1.6rem);
+  margin-top: 0;
+}
+.xray-head {
+  display: grid;
+  grid-template-columns: var(--name-col) repeat(4, 1fr) var(--target-col);
+  align-items: end;
+  gap: 0;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--line-strong);
+}
+.xray-head .gate-label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.66rem, 0.9vw, 0.78rem);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding-left: var(--gate-pad);
+  padding-right: 0.5rem;
+  border-left: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.xray-head .gate-label b {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: clamp(0.88rem, 1.25vw, 1.1rem);
+  letter-spacing: 0.04em;
+  margin-top: 0.2rem;
+  white-space: nowrap;
+}
+.xray-head .target-label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.66rem, 0.9vw, 0.78rem);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--paper);
+  padding-left: var(--gate-pad);
+  padding-bottom: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.lane {
+  display: grid;
+  grid-template-columns: var(--name-col) repeat(4, 1fr) var(--target-col);
+  align-items: stretch;
+  min-height: clamp(5.5rem, 9vh, 7rem);
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.lane-name {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-right: 1rem;
+}
+.lane-name .n {
+  font-size: clamp(1.05rem, 1.7vw, 1.45rem);
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.lane-name .n.mono { font-family: var(--font-mono), ui-monospace, monospace; font-size: clamp(0.95rem, 1.4vw, 1.18rem); }
+.lane-name .s {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--ink-3);
+  margin-top: 0.28rem;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* one grid cell per gate; the path is drawn inside it */
+.seg {
+  position: relative;
+  border-left: 1px solid var(--line);
+  padding-left: var(--gate-pad);
+  display: flex;
+  align-items: center;
+}
+.seg::before { /* the rail the path travels on */
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 2px;
+  background: var(--line);
+  transform: translateY(-50%);
+}
+.seg.dead::before { display: none; }
+/* the terminal segment carries rail only up to the stop bar */
+.seg.term::before { right: auto; width: 26%; }
+.seg .path {
+  position: absolute;
+  left: 0; top: 50%;
+  height: 4px;
+  transform: translateY(-50%) scaleX(0);
+  transform-origin: left center;
+  background: var(--accent);
+  transition: transform 460ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.seg.on .path { transform: translateY(-50%) scaleX(1); }
+.seg .path.full { right: 0; }
+.seg .path.stub { width: 26%; }
+.seg .node {
+  position: absolute;
+  right: -5px; top: 50%;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(-50%) scale(0);
+  transition: transform 260ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.seg.on .node { transform: translateY(-50%) scale(1); }
+
+/* the stop: a clay bar across the rail, at the gate that rejected the lane */
+.seg .stop {
+  position: absolute;
+  left: 26%; top: 50%;
+  width: 6px; height: 34px;
+  background: var(--clay);
+  border-radius: 2px;
+  transform: translate(-50%, -50%) scaleY(0);
+  transition: transform 240ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.seg.on .stop { transform: translate(-50%, -50%) scaleY(1); }
+
+/* the reason, written across the distance the lane did not travel */
+.reason {
+  grid-column: var(--from) / -2;
+  grid-row: 1;
+  align-self: center;
+  padding-left: calc(26% / var(--span, 1) + 1.1rem);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 300ms ease, transform 300ms ease;
+  pointer-events: none;
+}
+.reason.on { opacity: 1; transform: none; }
+.reason .code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.7rem, 0.95vw, 0.84rem);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--clay);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  white-space: nowrap;
+}
+.reason .code .how {
+  color: var(--ink-3);
+  font-size: 0.88em;
+  letter-spacing: 0.11em;
+}
+.reason .h {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.15rem, 2vw, 1.75rem);
+  line-height: 1.16;
+  color: var(--ink);
+  margin-top: 0.22rem;
+  max-width: 40ch;
+}
+.reason .commits {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.62rem, 0.95vw, 0.75rem);
+  color: var(--ink-2);
+  margin-top: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+}
+.reason .commits span {
+  background: var(--paper-deep);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0.05rem 0.35rem;
+}
+.reason .commits em { font-style: normal; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.68em; align-self: center; }
+
+/* the one lane that arrives */
+/* The claim is one object, so its rail is one band painted behind the whole
+   board rather than a block per lane. A lane that fails leaves the band bare,
+   which reads as "did not arrive" rather than as an empty placeholder. */
+.xray-board { position: relative; }
+.xray-board::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: var(--target-col);
+  background: var(--ink);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  z-index: 0;
+}
+.xray-head,
+.lane { position: relative; z-index: 1; }
+
+.lane-target {
+  grid-column: -2 / -1;
+  grid-row: 1;
+  color: var(--paper);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: var(--gate-pad);
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+.lane-target.on { opacity: 1; }
+.lane-target .v {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.66rem, 1vw, 0.8rem);
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+.lane-target .b { font-size: 0.66rem; color: rgba(245, 243, 238, 0.6); margin-top: 0.2rem; font-family: var(--font-mono), ui-monospace, monospace; }
+
+.xray-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+.replay {
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  border-radius: var(--r-sm);
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+}
+.replay:hover { background: var(--paper-deep); }
+
+/* ---------------------------------------------------------------- manifest */
+.manifest-wrap { opacity: 0; transform: translateY(10px); transition: opacity 420ms ease, transform 420ms ease; }
+.manifest-wrap.on { opacity: 1; transform: none; }
+
+.src-line {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.3rem, 2.4vw, 2rem);
+  line-height: 1.35;
+  color: var(--ink);
+}
+.src-line mark {
+  background: var(--accent-wash);
+  box-shadow: inset 0 -0.55em 0 var(--accent-wash), 0 0 0 1px var(--accent-line);
+  border-radius: 3px;
+  padding: 0 0.14em;
+  color: var(--accent);
+}
+.mf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--line);
+  margin-top: 1.6rem;
+}
+.mf-cell { padding: 1.1rem 1.2rem 1.2rem 0; border-right: 1px solid var(--line); }
+.mf-cell:last-child { border-right: 0; }
+.mf-cell dt {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.mf-cell dd {
+  margin: 0.4rem 0 0;
+  font-size: clamp(1rem, 1.5vw, 1.22rem);
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.mf-cell dd.mono { font-family: var(--font-mono), ui-monospace, monospace; font-size: clamp(0.85rem, 1.2vw, 1rem); font-weight: 500; }
+.mf-cell dd.addr { font-size: clamp(0.62rem, 0.82vw, 0.76rem); letter-spacing: -0.01em; white-space: nowrap; }
+.mf-cell .prov.addr { font-size: 0.62rem; white-space: nowrap; }
+.mf-cell .prov {
+  margin-top: 0.4rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--accent);
+}
+.mf-cell .prov.policy { color: var(--ink-3); }
+
+/* ---------------------------------------------------------------- refusal */
+.refusal { border-top: 1px solid var(--line); margin-top: 2.5rem; padding-top: 1.75rem; }
+.refusal-term {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.5rem, 3vw, 2.4rem);
+  color: var(--ink);
+  margin: 0.5rem 0 0;
+}
+.missing-list { list-style: none; margin: 1.4rem 0 0; padding: 0; display: grid; gap: 0.75rem; }
+.missing-list li { display: grid; grid-template-columns: minmax(7rem, 10rem) 1fr; gap: 1rem; align-items: baseline; border-top: 1px solid var(--line); padding-top: 0.7rem; }
+.missing-list .d {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--clay);
+}
+.missing-list .w { color: var(--ink-2); font-size: 0.95rem; max-width: 62ch; }
+.vocab-set { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.9rem; align-items: center; }
+.vocab-set .op {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.82rem;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  padding: 0.3rem 0.7rem;
+  color: var(--ink);
+}
+.vocab-set .brace { font-family: var(--font-mono), ui-monospace, monospace; font-size: 1.4rem; color: var(--ink-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .seg .path, .seg .node, .seg .stop, .reason, .lane-target, .manifest-wrap { transition: none !important; }
+}
+@media (max-width: 760px) {
+  .xray { --name-col: 7.5rem; --target-col: 5rem; }
+  .reason .h { font-size: 1rem; }
+}
+
+/* --- the claim, condensed, held at the top of the board while lanes resolve --- */
+.claim-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 1.4rem;
+  padding: 0.85rem 0 0.8rem;
+  margin-bottom: 0.4rem;
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line-strong);
+}
+.claim-sticky .q {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.05rem, 1.9vw, 1.6rem);
+  line-height: 1.15;
+  color: var(--ink);
+}
+.claim-sticky .m {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(0.62rem, 0.85vw, 0.74rem);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.claim-sticky .m b { color: var(--accent); font-weight: 600; }
+@media (max-width: 760px) {
+  .claim-sticky .q { font-size: 0.95rem; }
+}

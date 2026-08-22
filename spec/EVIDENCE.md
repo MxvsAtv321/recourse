@@ -249,6 +249,9 @@ cannot fail on a network call and cannot silently change underneath a rehearsed 
 are not a corpus, not an eval harness and nothing depends on them growing.
 
 ```ts
+/** accounts.upstream in agent/src/chain.ts: the address the escrow itself checks. */
+const PERMITTED_ISSUER = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
+
 const X402_RECEIPT: Artifact = {
   id: "x402-receipt",
   origin: "x402 Offer & Receipt extension, EIP-712 Receipt schema, specs/extensions/extension-offer-and-receipt.md",
@@ -317,7 +320,7 @@ const RECOURSE_COMMITMENT: Artifact = {
   subject: "RECORD",
   property: "GENERATION_TIME",
   binding: "PREIMAGE",
-  attestation: { kind: "SIGNED", issuer: "condition.permittedIssuer", scheme: "EIP712" },
+  attestation: { kind: "SIGNED", issuer: PERMITTED_ISSUER, scheme: "EIP712" },
 };
 ```
 
