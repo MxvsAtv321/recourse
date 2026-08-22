@@ -1,4 +1,4 @@
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
@@ -15,6 +15,13 @@ const nextConfig: NextConfig = {
       ...(config.resolve.extensionAlias ?? {}),
       ".js": [".ts", ".tsx", ".js"],
     };
+    // Node resolution walks up from the importing file, so a bare specifier in
+    // agent/src never reaches ui/node_modules: ui is not an ancestor of agent.
+    // On this machine it happened to resolve from agent/node_modules, which is
+    // an artifact of a local install and is absent on a clean checkout. The
+    // deploy installs only ui's dependencies, so say where they are.
+    const uiModules = join(dirname(fileURLToPath(import.meta.url)), "node_modules");
+    config.resolve.modules = [uiModules, ...(config.resolve.modules ?? ["node_modules"])];
     return config;
   },
 };

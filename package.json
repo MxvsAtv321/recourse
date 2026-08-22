@@ -12,6 +12,7 @@
     "inspect:check": "agent/node_modules/.bin/tsx agent/src/demo/inspect-check.ts",
     "inspect:walkthrough": "agent/node_modules/.bin/tsx agent/src/demo/inspect-walkthrough.ts",
     "sign:manifest": "agent/node_modules/.bin/tsx agent/src/demo/sign-manifest.ts",
-    "witness:check": "agent/node_modules/.bin/tsx agent/src/demo/witness-check.ts"
+    "witness:check": "agent/node_modules/.bin/tsx agent/src/demo/witness-check.ts",
+    "build:clean": "bash scripts/build-clean.sh"
   }
 }
