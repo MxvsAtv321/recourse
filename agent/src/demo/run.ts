@@ -21,6 +21,7 @@ import {
   walletFor,
 } from "../chain.js";
 import { compileListing, supportedRuleIds } from "../compiler.js";
+import { PROTECTED_PRICE_MICROS } from "../fixtures/offers.js";
 import { commitmentMessage, deliveryCommitmentTypes, domainFor, purchaseTermsTypes, termsMessage } from "../eip712.js";
 import { naiveAcceptanceChecks } from "../naive.js";
 import { SOURCE_ID, assembleFile, buildDelivery, commitTo, partiallyStale, payloadRefOf } from "../seller.js";
@@ -45,7 +46,7 @@ import {
 const ESCROW_ABI = escrowArtifact().abi as Abi;
 const USDC_ABI = usdcArtifact().abi as Abi;
 
-const AMOUNT = 100_000_000n; // 100 USDC, 6 decimals
+const AMOUNT = BigInt(PROTECTED_PRICE_MICROS); // the selected offer's price; USDC has 6 decimals
 const RECORD_COUNT = 500;
 const CHALLENGE_WINDOW = 30n;
 const CURE_PERIOD = 20n;

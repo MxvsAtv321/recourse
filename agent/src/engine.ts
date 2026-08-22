@@ -12,6 +12,7 @@ import {
   walletFor,
 } from "./chain.js";
 import { compileListing, supportedRuleIds } from "./compiler.js";
+import { PROTECTED_PRICE_MICROS } from "./fixtures/offers.js";
 import {
   commitmentMessage,
   deliveryCommitmentTypes,
@@ -42,7 +43,13 @@ import {
 
 // ------------------------------------------------------------------ constants
 
-export const AMOUNT = 100_000_000n; // 100 USDC, 6 decimals
+/**
+ * The amount escrowed is the advertised price of the offer the buyer's policy
+ * selected. USDC carries 6 decimals, so one millionth of a dollar is exactly one
+ * base unit and the price needs no conversion. Nothing about settlement changes:
+ * the escrow still pulls, releases and refunds terms.amount.
+ */
+export const AMOUNT = BigInt(PROTECTED_PRICE_MICROS);
 export const RECORD_COUNT = 500;
 export const CHALLENGE_WINDOW = 30n;
 export const CURE_PERIOD = 20n;

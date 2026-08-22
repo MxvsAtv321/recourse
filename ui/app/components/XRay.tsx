@@ -88,9 +88,124 @@ export function XRay({ view }: { view: XRayView }) {
         </div>
       </div>
 
+      <PolicyPanel view={view} on={tick >= last} />
       {view.manifest ? <ManifestPanel view={view} on={tick >= last} /> : null}
       {view.refusal ? <RefusalPanel view={view} on={tick >= last} /> : null}
     </>
+  );
+}
+
+/**
+ * The policy, printed as it runs. No model ranks, scores, recommends or selects:
+ * the rule below is a total function of the policy object and the offers.
+ */
+function PolicyPanel({ view, on }: { view: XRayView; on: boolean }) {
+  const d = view.decision;
+  return (
+    <section className={on ? "manifest-wrap on" : "manifest-wrap"} style={{ marginTop: "3.5rem" }} data-act="PROTECT">
+      <span className="eyebrow" data-step="PROTECT">
+        Purchasing policy
+      </span>
+      <h2 style={{ marginTop: "0.5rem" }}>The buyer decides. Deterministically.</h2>
+
+      <dl className="policy-obj">
+        <div>
+          <dt>maxPrice</dt>
+          <dd>{d.policy.maxPrice} per call</dd>
+        </div>
+        <div>
+          <dt>requiredClaim</dt>
+          <dd>&ldquo;{d.policy.requiredClaim}&rdquo;</dd>
+        </div>
+        <div>
+          <dt>protectionMandatory</dt>
+          <dd>{String(d.policy.protectionMandatory)}</dd>
+        </div>
+        <div className="rule">
+          <dt>selectionRule</dt>
+          <dd>{d.policy.selectionRule}</dd>
+        </div>
+      </dl>
+
+      <div className="offers">
+        {d.offers.map((o) => (
+          <article className={o.selected ? "offer selected" : "offer"} key={o.id} data-offer={o.id}>
+            <div className="offer-head">
+              <div>
+                <span className="v">{o.vendor}</span>
+                <span className="e">{o.endpoint}</span>
+              </div>
+              <span className="p">{o.price}</span>
+            </div>
+            <p className="ad">&ldquo;{o.advertises}&rdquo;</p>
+
+            <div className="pchecks">
+              {o.checks.map((c) => (
+                <div className={c.passed ? "pcheck ok" : "pcheck no"} key={c.label}>
+                  <span className="m" aria-hidden>
+                    {c.passed ? "\u2713" : "\u2715"}
+                  </span>
+                  <span className="l">{c.label}</span>
+                  <span className="d">{c.detail}</span>
+                </div>
+              ))}
+            </div>
+
+            {o.manifest ? (
+              <div className="sigbox">
+                <div className="sighead">
+                  signed protection manifest, served at <code>{o.manifest.servedAt}</code>
+                </div>
+                <dl>
+                  {o.manifest.fields.map((f) => (
+                    <div key={f.k}>
+                      <dt>{f.k}</dt>
+                      <dd>{f.v}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="roles">
+                  <div>
+                    <span className="rk">seller signed</span>
+                    <span className="rv">{o.manifest.signer}</span>
+                  </div>
+                  <div>
+                    <span className="rk">permittedIssuer named inside</span>
+                    <span className="rv">{o.manifest.permittedIssuer}</span>
+                  </div>
+                </div>
+                <p className="rolenote">
+                  {o.manifest.rolesSeparate
+                    ? "Two different keys. The seller signs what is promised. The issuer signs what was observed, and only the issuer's signature is what the escrow checks at settlement."
+                    : "One key signs both, which collapses the two trust roles."}
+                </p>
+                <div className="sig">{o.manifest.signature}</div>
+              </div>
+            ) : null}
+
+            <div className={o.eligible ? "presult ok" : "presult no"}>
+              {o.eligible ? (
+                <>
+                  <b>Policy result: eligible.</b> {o.selected ? "Lowest priced offer satisfying the policy." : ""}
+                </>
+              ) : (
+                o.refusal
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="decision" data-result={d.result}>
+        <span className="dk">policy result</span>
+        <span className="dv">{d.result.replace(/_/g, " ")}</span>
+        <p>{d.rationale}</p>
+        <p className="funded">
+          The escrow funds {d.fundedPrice}, which is {d.fundedBaseUnits} base units of a six decimal asset, and that is
+          the advertised price of the selected offer.
+        </p>
+      </div>
+    </section>
   );
 }
 

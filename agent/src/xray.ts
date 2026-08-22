@@ -20,6 +20,8 @@ import {
   type Reason,
 } from "./evidence.js";
 import { protect, type Manifest, type Missing } from "./inspect.js";
+import { decide, formatMicros, type Decision, type Offer } from "./policy.js";
+import { BUYER_POLICY, OFFERS } from "./fixtures/offers.js";
 import {
   MEASURED,
   OBLIGOR,
@@ -161,6 +163,47 @@ export type RefusalView = {
   opcodes: readonly string[];
 };
 
+export type PolicyView = {
+  maxPrice: string;
+  requiredClaim: string;
+  protectionMandatory: boolean;
+  selectionRule: string;
+};
+
+export type OfferView = {
+  id: string;
+  vendor: string;
+  endpoint: string;
+  price: string;
+  priceMicros: number;
+  advertises: string;
+  checks: { label: string; passed: boolean; detail: string }[];
+  eligible: boolean;
+  refusal: string | null;
+  selected: boolean;
+  /** Present only when the provider publishes a signed commercial manifest. */
+  manifest: {
+    signer: string;
+    signature: string;
+    permittedIssuer: string;
+    /** A string comparison, so the page can state it without doing crypto. */
+    rolesSeparate: boolean;
+    fields: { k: string; v: string }[];
+    servedAt: string;
+  } | null;
+};
+
+export type DecisionView = {
+  policy: PolicyView;
+  offers: OfferView[];
+  result: "PURCHASE" | "PURCHASE_NOTHING";
+  rationale: string;
+  selectedOfferId: string | null;
+  /** What the escrow will actually fund. Must equal the selected offer's price. */
+  fundedPrice: string;
+  fundedBaseUnits: string;
+};
+
 export type XRayView = {
   claim: ClaimView;
   gates: { index: Gate; name: string; short: string }[];
@@ -168,6 +211,7 @@ export type XRayView = {
   observedWindow: string;
   manifest: ManifestView | null;
   refusal: RefusalView | null;
+  decision: DecisionView;
 };
 
 // ------------------------------------------------------------------ builders
@@ -280,6 +324,57 @@ export function buildXRay(artifacts: readonly Artifact[] = MEASURED): XRayView {
       ? { status: "REFUSED", requirement: VAGUE_REQUIREMENT, missing: refused.missing, opcodes: OPCODES }
       : null;
 
+  const d: Decision = decide(BUYER_POLICY, claim, OFFERS, { obligor: OBLIGOR });
+  const offerView = (o: Offer, selected: boolean): OfferView => {
+    const e = d.evaluations.find((x) => x.offer.id === o.id)!;
+    return {
+      id: o.id,
+      vendor: o.vendor,
+      endpoint: o.endpoint,
+      price: formatMicros(o.priceMicrosUsd),
+      priceMicros: o.priceMicrosUsd,
+      advertises: o.advertises,
+      checks: e.checks,
+      eligible: e.eligible,
+      refusal: e.refusal,
+      selected,
+      manifest: o.manifest
+        ? {
+            signer: o.manifest.signer,
+            signature: o.manifest.signature,
+            permittedIssuer: o.manifest.manifest.permittedIssuer,
+            rolesSeparate:
+              o.manifest.signer.toLowerCase() !== o.manifest.manifest.permittedIssuer.toLowerCase(),
+            fields: [
+              { k: "claim", v: o.manifest.manifest.claim },
+              { k: "subject", v: o.manifest.manifest.subject },
+              { k: "property", v: o.manifest.manifest.property },
+              { k: "thresholdSeconds", v: o.manifest.manifest.thresholdSeconds },
+              { k: "expectedSourceId", v: o.manifest.manifest.expectedSourceId },
+              { k: "priceMicrosUsd", v: o.manifest.manifest.priceMicrosUsd },
+            ],
+            servedAt: "/api/manifest",
+          }
+        : null,
+    };
+  };
+  const selectedOffer = OFFERS.find((o) => o.id === d.selectedOfferId) ?? null;
+
+  const decision: DecisionView = {
+    policy: {
+      maxPrice: formatMicros(BUYER_POLICY.maxPriceMicrosUsd),
+      requiredClaim: BUYER_POLICY.requiredClaim,
+      protectionMandatory: BUYER_POLICY.protectionMandatory,
+      selectionRule: BUYER_POLICY.selectionRule,
+    },
+    offers: OFFERS.map((o) => offerView(o, o.id === d.selectedOfferId)),
+    result: d.result,
+    rationale: d.rationale,
+    selectedOfferId: d.selectedOfferId,
+    fundedPrice: selectedOffer ? formatMicros(selectedOffer.priceMicrosUsd) : "nothing",
+    fundedBaseUnits: selectedOffer ? String(selectedOffer.priceMicrosUsd) : "0",
+  };
+
   return {
     claim: claimView,
     gates: ([1, 2, 3, 4] as Gate[]).map((index) => ({
@@ -291,6 +386,7 @@ export function buildXRay(artifacts: readonly Artifact[] = MEASURED): XRayView {
     observedWindow: OBSERVED_WINDOW,
     manifest,
     refusal,
+    decision,
   };
 }
 

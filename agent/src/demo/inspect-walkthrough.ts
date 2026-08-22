@@ -7,6 +7,8 @@
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { TIMING, gateOnAt, manifestOnAt, reasonOnAt, targetOnAt, totalTicks } from "../xray.js";
+import { verifyManifest, type SignedManifest } from "../manifest.js";
+import { BUYER_POLICY, OFFERS } from "../fixtures/offers.js";
 
 const ROOT = new URL("../../../", import.meta.url).pathname;
 const FIXTURE = `${ROOT}agent/src/fixtures/evidence.ts`;
@@ -26,7 +28,7 @@ const check = (label: string, ok: boolean, detail = "") => {
   console.log(`  ${ok ? "PASS" : "FAIL"}  ${label}${detail ? `  ${detail}` : ""}`);
 };
 
-const strip = (h: string) => h.replace(/<[^>]+>/g, " ");
+const strip = (h: string) => h.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]+>/g, " ");
 const ent = (s: string) =>
   s.replace(/&ldquo;|&rdquo;/g, '"').replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/&#x27;|&rsquo;/g, "'");
 const flat = (h: string) => ent(strip(h)).replace(/\s+/g, " ").trim();
@@ -420,7 +422,100 @@ await serve(async (html, port) => {
   }
 });
 
-head("8  CHANGING A FIXTURE CHANGES THE SCREEN");
+head("8  THE PURCHASING POLICY");
+
+await serve(async (html, port) => {
+  const cell = (re: RegExp) => (html.match(re) ? flat(html.match(re)![1]) : "MISSING");
+  console.log("\n  the policy, as it renders:");
+  const polBlock = html.slice(html.indexOf('class="policy-obj"'), html.indexOf('class="offers"'));
+  const pol = [...polBlock.matchAll(/<dt>([a-zA-Z]+)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map((m) => [m[1], flat(m[2])]);
+  for (const [k, v] of pol) console.log(`    ${k.padEnd(20)} ${v}`);
+  check("the policy renders as an explicit object", pol.length >= 4);
+  check("  it carries a maximum price", html.includes("maxPrice"));
+  check("  a required claim", html.includes("requiredClaim") && html.includes(BUYER_POLICY.requiredClaim));
+  check("  whether protection is mandatory", html.includes("protectionMandatory"));
+  check("  and the selection rule, printed verbatim", html.includes("choose the lowest priced offer"));
+
+  console.log("\n  each offer, as a checklist against that policy:");
+  const blocks = html.split('data-offer="').slice(1);
+  const offers = blocks.map((b) => {
+    const id = b.slice(0, b.indexOf('"'));
+    const price = b.match(/class="p">([^<]+)</);
+    const checks = [...b.matchAll(/class="pcheck (ok|no)"[\s\S]*?class="l">([^<]*)<[\s\S]*?class="d">([\s\S]*?)<\/span>/g)].map(
+      (m) => ({ ok: m[1] === "ok", label: flat(m[2]), detail: flat(m[3]) }),
+    );
+    const res = b.match(/class="presult (ok|no)">([\s\S]*?)<\/div>/);
+    return { id, price: price ? price[1] : "?", checks, eligible: res?.[1] === "ok", result: flat(res?.[2] ?? "") };
+  });
+  for (const o of offers) {
+    console.log(`\n    ${o.id}   ${o.price}`);
+    for (const c of o.checks) console.log(`      ${c.ok ? "PASS" : "FAIL"}  ${c.label.padEnd(38)} ${c.detail}`);
+    console.log(`      -> ${o.result}`);
+  }
+  check("both offers are evaluated as checklists", offers.length === 2 && offers.every((o) => o.checks.length === 3));
+
+  const cheap = offers.find((o) => o.id === "aisa-coingecko-markets")!;
+  const prot = offers.find((o) => o.id !== "aisa-coingecko-markets")!;
+  console.log("");
+  check("the cheaper offer is within the price bound", cheap.checks[0].ok, cheap.price);
+  check("  but the required claim is not establishable there", !cheap.checks[1].ok);
+  check("  so the policy is not satisfied", !cheap.eligible);
+  check("  and the refusal names the buyer requirement", cheap.result.includes(BUYER_POLICY.requiredClaim));
+  check("  and states the policy result", /Policy result: do not purchase/.test(cheap.result));
+  const vendorWords = /deficient|inadequate|unreliable|bad |poor |untrustworthy|fails to deliver|misleading/i;
+  check("  and characterises no vendor", !vendorWords.test(cheap.result), JSON.stringify(cheap.result.slice(0, 96)));
+
+  check("the protected offer satisfies every requirement", prot.eligible && prot.checks.every((c) => c.ok));
+  const result = html.match(/data-result="(\w+)"/);
+  console.log(`\n  policy result: ${result?.[1]}`);
+  check("the selection rule selects it", result?.[1] === "PURCHASE" && html.includes("offer selected"));
+
+  head("8b  THE SERVED MANIFEST, VERIFIED BY THE BUYER");
+  const served = (await fetch(`http://127.0.0.1:${port}/api/manifest`).then((r) => r.json())) as SignedManifest;
+  console.log(`\n  fetched /api/manifest`);
+  console.log(`    offerId          ${served.manifest.offerId}`);
+  console.log(`    claim            "${served.manifest.claim}"`);
+  console.log(`    priceMicrosUsd   ${served.manifest.priceMicrosUsd}`);
+  console.log(`    permittedIssuer  ${served.manifest.permittedIssuer}`);
+  console.log(`    claimed signer   ${served.signer}`);
+  const v = await verifyManifest(served);
+  console.log(`    recovered signer ${v.recovered}`);
+  console.log(`    verdict          ${v.reason}`);
+  check("the served manifest verifies against the seller signature", v.ok, `recovered ${v.recovered}`);
+  check("  the recovered signer is the claimed seller", v.recovered?.toLowerCase() === served.signer.toLowerCase());
+  check("  the seller key is not the evidence issuer key", v.rolesSeparate);
+  check(
+    "  and the manifest names the issuer whose commitments the escrow accepts",
+    served.manifest.permittedIssuer.toLowerCase() ===
+      OFFERS.find((o) => o.manifest)!.manifest!.manifest.permittedIssuer.toLowerCase(),
+  );
+
+  const tampered: SignedManifest = { ...served, manifest: { ...served.manifest, priceMicrosUsd: "1" } };
+  const bad = await verifyManifest(tampered);
+  check("  a manifest with an edited price no longer verifies", !bad.ok, bad.reason);
+
+  head("8c  THE PRICE THE BUYER SEES IS THE PRICE THE ESCROW FUNDS");
+  const selected = OFFERS.find((o) => o.id !== "aisa-coingecko-markets")!;
+  const run = JSON.parse(readFileSync(`${ROOT}ui/data/run.json`, "utf8"));
+  const funded = run.protectedPurchase.amount;
+  const refunded = run.protectedPurchase.settlement.refundAmount;
+  console.log(`\n  advertised price of the selected offer   ${selected.priceMicrosUsd} micros = $${(selected.priceMicrosUsd / 1e6).toFixed(3)}`);
+  console.log(`  amount the escrow funded                 ${funded} base units`);
+  console.log(`  amount refunded on the breach proof      ${refunded} base units`);
+  console.log(`  refund transaction                       ${run.protectedPurchase.settlement.txHash}`);
+  check("funded equals the advertised price", String(selected.priceMicrosUsd) === String(funded));
+  check("refunded equals the advertised price", String(selected.priceMicrosUsd) === String(refunded));
+  const fundedLine = flat((html.match(/class="funded">([\s\S]*?)<\/p>/) ?? ["", ""])[1]).replace(/<!--\s*-->/g, "");
+  console.log(`  the page states                          ${fundedLine}`);
+  check(
+    "the page states the same figure",
+    fundedLine.includes(`${selected.priceMicrosUsd} base units`) && fundedLine.includes("$0.010"),
+    fundedLine.slice(0, 80),
+  );
+  console.log("\n  USDC carries 6 decimals, so one millionth of a dollar is one base unit and no conversion applies.");
+});
+
+head("9  CHANGING A FIXTURE CHANGES THE SCREEN");
 
 const before = readFileSync(FIXTURE, "utf8");
 const laneBefore = first.lanes[1];

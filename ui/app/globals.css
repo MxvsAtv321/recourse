@@ -1428,3 +1428,121 @@ details[open] .chev {
   transition: opacity 220ms ease;
 }
 .claim-sticky.stuck { opacity: 1; }
+
+/* ================================================================ PROTECT: the purchasing policy */
+
+.policy-obj {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin: 1.6rem 0 2rem;
+}
+.policy-obj > div { padding: 1rem 1.2rem 1.1rem 0; border-right: 1px solid var(--line); }
+.policy-obj > div:last-child { border-right: 0; }
+.policy-obj .rule { grid-column: 1 / -1; border-right: 0; border-top: 1px solid var(--line); }
+.policy-obj dt {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+.policy-obj dd { margin: 0.35rem 0 0; font-size: 1.02rem; font-weight: 600; color: var(--ink); }
+.policy-obj .rule dd { font-weight: 400; font-size: 0.98rem; color: var(--ink-2); max-width: 78ch; }
+
+.offers { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .offers { grid-template-columns: 1fr 1fr; gap: 1.5rem; } }
+
+.offer {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: 1.25rem 1.35rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.offer.selected { border-color: var(--accent-line); box-shadow: var(--shadow-card); }
+
+.offer-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.offer-head .v { display: block; font-size: 1.15rem; font-weight: 600; }
+.offer-head .e {
+  display: block;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--ink-3);
+  margin-top: 0.2rem;
+}
+.offer-head .p { font-family: var(--font-display), Georgia, serif; font-size: 1.75rem; white-space: nowrap; }
+.offer .ad { font-size: 0.9rem; color: var(--ink-2); font-style: italic; }
+
+.pchecks { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.pcheck {
+  display: grid;
+  grid-template-columns: 1.1rem max-content 1fr;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.pcheck .m { font-weight: 700; }
+.pcheck.ok .m { color: var(--accent); }
+.pcheck.no .m { color: var(--clay); }
+.pcheck .l { font-weight: 600; font-size: 0.92rem; }
+.pcheck .d { font-size: 0.8rem; color: var(--ink-3); text-align: right; }
+
+.sigbox { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--paper-deep); padding: 0.9rem 1rem; }
+.sighead {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.6rem;
+}
+.sigbox dl { display: grid; gap: 0.2rem; margin: 0 0 0.7rem; }
+.sigbox dl > div { display: grid; grid-template-columns: 10rem 1fr; gap: 0.6rem; }
+.sigbox dt { font-family: var(--font-mono), ui-monospace, monospace; font-size: 0.7rem; color: var(--ink-3); }
+.sigbox dd { margin: 0; font-size: 0.8rem; color: var(--ink); overflow-wrap: anywhere; }
+.roles { display: grid; gap: 0.45rem; border-top: 1px solid var(--line-strong); padding-top: 0.6rem; }
+.roles .rk {
+  display: block;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.roles .rv { font-family: var(--font-mono), ui-monospace, monospace; font-size: 0.72rem; color: var(--accent); }
+.rolenote { font-size: 0.8rem; color: var(--ink-2); margin-top: 0.6rem; max-width: 58ch; }
+.sig {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6rem;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
+.presult { margin-top: auto; border-radius: var(--r-md); padding: 0.85rem 1rem; font-size: 0.92rem; line-height: 1.45; }
+.presult.ok { background: var(--accent-wash); border: 1px solid var(--accent-line); color: var(--ink); }
+.presult.no { background: var(--clay-wash); border: 1px solid color-mix(in srgb, var(--clay) 25%, transparent); color: var(--ink); }
+
+.decision { margin-top: 1.75rem; border-top: 2px solid var(--ink); padding-top: 1.1rem; }
+.decision .dk {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  display: block;
+}
+.decision .dv {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  display: block;
+  margin: 0.15rem 0 0.5rem;
+}
+.decision p { color: var(--ink-2); max-width: 70ch; }
+.decision .funded { margin-top: 0.5rem; font-size: 0.9rem; color: var(--ink-3); }

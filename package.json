@@ -10,6 +10,7 @@
     "test": "$HOME/.foundry/bin/forge test -vv",
     "check:conditions": "agent/node_modules/.bin/tsx agent/src/demo/check-condition-views.ts",
     "inspect:check": "agent/node_modules/.bin/tsx agent/src/demo/inspect-check.ts",
-    "inspect:walkthrough": "agent/node_modules/.bin/tsx agent/src/demo/inspect-walkthrough.ts"
+    "inspect:walkthrough": "agent/node_modules/.bin/tsx agent/src/demo/inspect-walkthrough.ts",
+    "sign:manifest": "agent/node_modules/.bin/tsx agent/src/demo/sign-manifest.ts"
   }
 }

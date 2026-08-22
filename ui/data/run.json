@@ -2,8 +2,8 @@
   "meta": {
     "chainId": 31337,
     "rpc": "http://127.0.0.1:8545",
-    "capturedAt": "2026-08-11T00:14:19.277Z",
-    "chainTime": "1786407332",
+    "capturedAt": "2026-08-22T05:53:57.953Z",
+    "chainTime": "1787378110",
     "blockNumber": "23",
     "escrow": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
     "usdc": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
@@ -32,7 +32,7 @@
       {
         "name": "file hash matches timestamp",
         "passed": true,
-        "detail": "0x40006f022f870cd9..."
+        "detail": "0xf9a8c92c1b4b6438..."
       },
       {
         "name": "signed blob timestamp authentic",
@@ -47,15 +47,15 @@
     ],
     "allPassed": true,
     "payment": {
-      "amount": "100000000",
+      "amount": "10000",
       "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-      "txHash": "0x5858920f403ee3456ce7411ea8a7322fe62a913a38bd58a2208262e3be08529a",
+      "txHash": "0xbf9139ca535b950159eb46258ef7b8643409d10c19521b4fafb5630fc6bebbc0",
       "blockNumber": "5"
     },
     "blobTimestamp": {
-      "at": "1786407259",
+      "at": "1787378037",
       "issuer": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
-      "blobHash": "0x40006f022f870cd9525ea32f60fc145bb44734ed86dd222a69d4651a19782627"
+      "blobHash": "0xf9a8c92c1b4b643840435fca85e13ef38993f52ac7f9eaf90808eece21261ed6"
     },
     "reveal": {
       "windowSeconds": "3600",
@@ -67,31 +67,31 @@
       "samples": [
         {
           "index": 0,
-          "generatedAt": "1786407169",
+          "generatedAt": "1787377947",
           "ageSeconds": "90",
           "stale": false
         },
         {
           "index": 186,
-          "generatedAt": "1786407169",
+          "generatedAt": "1787377947",
           "ageSeconds": "90",
           "stale": false
         },
         {
           "index": 187,
-          "generatedAt": "1786313659",
+          "generatedAt": "1787284437",
           "ageSeconds": "93600",
           "stale": true
         },
         {
           "index": 188,
-          "generatedAt": "1786313659",
+          "generatedAt": "1787284437",
           "ageSeconds": "93600",
           "stale": true
         },
         {
           "index": 499,
-          "generatedAt": "1786313659",
+          "generatedAt": "1787284437",
           "ageSeconds": "93600",
           "stale": true
         }
@@ -99,11 +99,11 @@
     }
   },
   "protectedPurchase": {
-    "specHash": "0xdeb6ed64fd3cf7c47b22a91928c6e60049b32550023c982352995b297ab6231d",
-    "amount": "100000000",
+    "specHash": "0xbe5adb671db9bc6cc3f2b97ce984e188b9f38433a3a9cdacb9e07c2e7f5737ee",
+    "amount": "10000",
     "challengeWindowSeconds": "30",
     "curePeriodSeconds": "20",
-    "deliveryDeadline": "1786407859",
+    "deliveryDeadline": "1787378637",
     "conditions": [
       {
         "conditionId": 1,
@@ -112,7 +112,7 @@
         "claimType": "RECORD_GENERATION_TIME",
         "quantifier": "UNIVERSAL",
         "opcode": "TIMESTAMP_GTE",
-        "threshold": "1786403659",
+        "threshold": "1787374437",
         "thresholdKind": "timestamp",
         "permittedIssuer": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
         "expectedSourceId": "0xc53fef9f35628ff5bf2cd4cc96a259445f5e327e5cb0d4c121b014281aa142b7",
@@ -143,16 +143,16 @@
       "whyRejected": "A signed timestamp over the delivered file establishes when the file existed. It says nothing about when the records inside it were generated.",
       "escrowBalanceAfter": "0"
     },
-    "openTx": "0x2c9b4316ca63d3d70fb1b162e132b43afb8ae1fa10ed9693689f1e5ea732ade7",
+    "openTx": "0x93e4465b8150638e293c89e934589225767ceb8921b9d38f2074542c9e14cd53",
     "commitment": {
-      "merkleRoot": "0xba47178a1464959a23025107a454bf66c5783292a0336e8c83d5332d1489043a",
+      "merkleRoot": "0xa37613826c069d30ec9dd3a8675cf05332b62a4650690ab2e98a15f544bd331a",
       "leafCount": "500",
       "sourceId": "0xc53fef9f35628ff5bf2cd4cc96a259445f5e327e5cb0d4c121b014281aa142b7",
-      "payloadRef": "0x40006f022f870cd9525ea32f60fc145bb44734ed86dd222a69d4651a19782627",
+      "payloadRef": "0xf9a8c92c1b4b643840435fca85e13ef38993f52ac7f9eaf90808eece21261ed6",
       "issuer": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
       "txHashes": [
-        "0x9180d4521e00ef11bce74c168c5f10452169654fa0285f2d75c1fac1d7bf233c",
-        "0xa65cb20d80f36f5e7bb6f4757329c42758f2f3fcf8ed1d48ddca94600164ee9c"
+        "0xc3290513f77e0d2dad20e867cc0fc347bf6248aecd5cb437fe34cd120af1705a",
+        "0xb3eee140c95c2b3f11c8ceba96209abbd6cab592152bc992c191a7022edc04a3"
       ],
       "leafFormula": "keccak256(abi.encode(index, keccak256(recordBytes), generatedAt, sourceId))"
     },
@@ -160,8 +160,8 @@
       "totalRecords": 500,
       "violations": 251,
       "firstViolationIndex": 187,
-      "observedAt": "1786313659",
-      "thresholdAt": "1786403659",
+      "observedAt": "1787284437",
+      "thresholdAt": "1787374437",
       "shortBySeconds": "90000",
       "scalar": {
         "conditionId": 2,
@@ -219,19 +219,19 @@
     ],
     "settlement": {
       "verdict": "BREACH_PROVED",
-      "refundAmount": "100000000",
+      "refundAmount": "10000",
       "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-      "txHash": "0xa7a239b49bc76128a4f34a5542640c83eead5c2c026a68ac45faa3c22d05ec68",
+      "txHash": "0xd72872a3aae87834eac57f3dbd7d637c6a83207f98b86ac25742641c2b8586a0",
       "blockNumber": "9",
       "offendingIndex": "187",
       "escrowBalanceAfter": "0"
     }
   },
   "release": {
-    "specHash": "0xabd6308f7d7a3929b0158b9a96a21db3b055c0f0917061c8d8d937855464286a",
-    "amount": "100000000",
+    "specHash": "0xf3aa4f6f4ee8942a582ca58fa2992169103e9075353caf9cbb7d45b9de82bee8",
+    "amount": "10000",
     "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-    "txHash": "0x9d1aea74d0bfea92d396b00efe3b7731c3b989f467bb944b1e4cfd6156f10629",
+    "txHash": "0x94fee804e0f6fd1a6b746584666a9101b36cde2b905a16baa6916ee4e062b091",
     "violations": 0,
     "scalarObserved": "500",
     "scalarThreshold": "500",
@@ -244,8 +244,7 @@
       "row-count-at-least",
       "row-count-exactly",
       "record-freshness-hours",
-      "record-freshness-minutes",
-      "record-schema"
+      "record-freshness-minutes"
     ],
     "opcodes": [
       "UINT_GTE",
@@ -256,21 +255,21 @@
     "escrowOpened": false
   },
   "stalled": {
-    "specHash": "0x00ed6dc48aeec596ed4ed8bd5ac1c2ff20d942c58f38835ebc1b12dd47531151",
-    "amount": "100000000",
+    "specHash": "0x127f9b7ca57c081ed7e59dee57e8e942b0d6aef57fcbac2af35c222a4260279e",
+    "amount": "10000",
     "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-    "txHash": "0x3b1ff71c1a4e43a688e830ea4ce18b0a7dfea606f5d65da82eb845170d2e2975",
+    "txHash": "0x1c494565de39c8c854760faf673c83ff2ba9add30cae8995fe3491346b1c7ab8",
     "committed": 0,
     "required": 2,
-    "deadline": "1786407310",
+    "deadline": "1787378088",
     "earlyReclaimError": "DeliveryDeadlineNotReached"
   },
   "withheld": {
-    "specHash": "0xf775cba3243e0bd31a217e108adf1bd0e1a4bc7b0af7d3e9016d7155a10cb243",
-    "amount": "100000000",
+    "specHash": "0x0485462f4732b2562aaca44bbf4bf26708ab6d5d895ae53709f3493f0389c512",
+    "amount": "10000",
     "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-    "txHash": "0xc2b091938420ccf817f2f6b1a8483dbc2e8fbb114386d9f65b8437b93ecc091a",
-    "payloadRef": "0x6f26915a4374d15a26c1282370fadee1fbe16750e4c6478fd3cd7d4f7c77019a",
+    "txHash": "0xc4e2e6424de32161abf73e135dc974d3e4ae92296219e70816ec61d253a56d97",
+    "payloadRef": "0x8dc7f7390874fc83a8c0e78afcdb0f186c4eace8460a53f8f23fe26e1eb95055",
     "challengedIndex": "42",
     "curePeriodSeconds": "20",
     "answered": false,
