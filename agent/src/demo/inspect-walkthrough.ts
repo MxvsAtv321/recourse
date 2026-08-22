@@ -280,6 +280,20 @@ const first = await serve(async (html) => {
   // A screenshot caught the reason blocks auto-placing into an implicit second
   // grid row, so each one sat under its own rail and read as belonging to the
   // lane below. HTML assertions cannot see that. This guards the regression.
+  // IntersectionObserver rejects rem in rootMargin and the throw happens inside a
+  // useEffect, which with no error boundary tears down the whole client tree.
+  // The walkthrough only reads server-rendered HTML, so it cannot see that. This
+  // is the cheapest guard that would have caught it.
+  const tsx = readFileSync(`${ROOT}ui/app/components/XRay.tsx`, "utf8");
+  const margins = [...tsx.matchAll(/rootMargin:\s*[`"']([^`"']*)[`"']/g)].map((m) => m[1]);
+  console.log(`\n  rootMargin literals in the client component: ${margins.map((m) => JSON.stringify(m)).join(", ") || "none"}`);
+  check(
+    "every rootMargin is in px or percent, never rem",
+    margins.every((m) => m.split(/\s+/).every((part) => /^-?\$\{[^}]*\}px$|^-?[\d.]+(px|%)$|^0$/.test(part))),
+    margins.join(" | "),
+  );
+  check("the observer cannot take the page down", /catch\s*{[\s\S]{0,200}setStuck\(true\)/.test(tsx));
+
   const css = readFileSync(`${ROOT}ui/app/globals.css`, "utf8");
   const reasonBlock = css.slice(css.indexOf(".reason {"), css.indexOf(".reason.on"));
   check("the reason is pinned to its own lane row, not auto-placed", /grid-row:\s*1/.test(reasonBlock));
@@ -431,6 +445,10 @@ await serve(async (html, port) => {
   const pol = [...polBlock.matchAll(/<dt>([a-zA-Z]+)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map((m) => [m[1], flat(m[2])]);
   for (const [k, v] of pol) console.log(`    ${k.padEnd(20)} ${v}`);
   check("the policy renders as an explicit object", pol.length >= 4);
+  check(
+    "  and is not gated behind the animation, so it is readable at any point",
+    /class="policy-act"/.test(html) && !/class="manifest-wrap"[^>]*data-act="PROTECT"/.test(html),
+  );
   check("  it carries a maximum price", html.includes("maxPrice"));
   check("  a required claim", html.includes("requiredClaim") && html.includes(BUYER_POLICY.requiredClaim));
   check("  whether protection is mandatory", html.includes("protectionMandatory"));
@@ -441,7 +459,7 @@ await serve(async (html, port) => {
   const offers = blocks.map((b) => {
     const id = b.slice(0, b.indexOf('"'));
     const price = b.match(/class="p">([^<]+)</);
-    const checks = [...b.matchAll(/class="pcheck (ok|no)"[\s\S]*?class="l">([^<]*)<[\s\S]*?class="d">([\s\S]*?)<\/span>/g)].map(
+    const checks = [...b.matchAll(/class="pcheck (ok|no)"[\s\S]*?class="l">([^<]*)<[\s\S]*?<p class="d">([\s\S]*?)<\/p>/g)].map(
       (m) => ({ ok: m[1] === "ok", label: flat(m[2]), detail: flat(m[3]) }),
     );
     const res = b.match(/class="presult (ok|no)">([\s\S]*?)<\/div>/);

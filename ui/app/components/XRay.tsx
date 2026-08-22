@@ -29,10 +29,22 @@ export function XRay({ view }: { view: XRayView }) {
   useEffect(() => {
     const el = stickyRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => setStuck(e.intersectionRatio < 1), {
-      threshold: [1],
-      rootMargin: "-3.7rem 0px 0px 0px",
-    });
+    // rootMargin accepts px and % only, never rem. Measure the masthead instead
+    // of restating its height, so this cannot drift from the CSS.
+    const mast = document.querySelector(".masthead");
+    const offset = Math.ceil(mast?.getBoundingClientRect().height ?? 58) + 1;
+    let io: IntersectionObserver;
+    try {
+      io = new IntersectionObserver(([e]) => setStuck(e.intersectionRatio < 1), {
+        threshold: [1],
+        rootMargin: `-${offset}px 0px 0px 0px`,
+      });
+    } catch {
+      // A stuck detector is a nicety. It must never be able to take the page
+      // down, so fall back to showing the condensed claim always.
+      setStuck(true);
+      return;
+    }
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -88,7 +100,7 @@ export function XRay({ view }: { view: XRayView }) {
         </div>
       </div>
 
-      <PolicyPanel view={view} on={tick >= last} />
+      <PolicyPanel view={view} />
       {view.manifest ? <ManifestPanel view={view} on={tick >= last} /> : null}
       {view.refusal ? <RefusalPanel view={view} on={tick >= last} /> : null}
     </>
@@ -99,10 +111,15 @@ export function XRay({ view }: { view: XRayView }) {
  * The policy, printed as it runs. No model ranks, scores, recommends or selects:
  * the rule below is a total function of the policy object and the offers.
  */
-function PolicyPanel({ view, on }: { view: XRayView; on: boolean }) {
+/**
+ * The policy is the buyer's input, not a result of the animation, so it is never
+ * gated behind the lanes resolving. A judge must be able to read the rule and
+ * execute it themselves at any point on the page.
+ */
+function PolicyPanel({ view }: { view: XRayView }) {
   const d = view.decision;
   return (
-    <section className={on ? "manifest-wrap on" : "manifest-wrap"} style={{ marginTop: "3.5rem" }} data-act="PROTECT">
+    <section className="policy-act" style={{ marginTop: "3.5rem" }} data-act="PROTECT">
       <span className="eyebrow" data-step="PROTECT">
         Purchasing policy
       </span>
@@ -137,6 +154,9 @@ function PolicyPanel({ view, on }: { view: XRayView; on: boolean }) {
               </div>
               <span className="p">{o.price}</span>
             </div>
+            <span className={o.selected ? "ostate sel" : "ostate ref"}>
+              {o.selected ? "Selected by the policy" : "Policy not satisfied"}
+            </span>
             <p className="ad">&ldquo;{o.advertises}&rdquo;</p>
 
             <div className="pchecks">
@@ -146,7 +166,7 @@ function PolicyPanel({ view, on }: { view: XRayView; on: boolean }) {
                     {c.passed ? "\u2713" : "\u2715"}
                   </span>
                   <span className="l">{c.label}</span>
-                  <span className="d">{c.detail}</span>
+                  <p className="d">{c.detail}</p>
                 </div>
               ))}
             </div>
