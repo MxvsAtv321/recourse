@@ -1921,3 +1921,227 @@ details[open] .chev {
 .pff .fv { grid-column: 2 / -1; margin: 0.15rem 0 0; display: grid; gap: 0.1rem; font-family: var(--font-mono), ui-monospace, monospace; font-size: clamp(0.7rem, 0.95vw, 0.8rem); color: var(--ink-3); overflow-wrap: anywhere; }
 .pf-note { margin-top: 1rem; font-size: 0.9rem; color: var(--ink-2); max-width: 68ch; }
 .pf-tx { margin-top: 0.6rem; font-family: var(--font-mono), ui-monospace, monospace; font-size: 0.72rem; color: var(--ink-3); overflow-wrap: anywhere; }
+
+/* ================================================================ presentation mode
+   Fourteen full screen states. The root is fixed and clipped, so there is no
+   scrollbar and no page edge. Type is sized in vmin, which on a 16:9 projector
+   is the height, so a state cannot grow past the screen it is shown on. */
+
+.present {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--paper);
+  display: grid;
+  place-items: center;
+  padding: 6vmin 7vmin;
+  cursor: none;
+}
+.present:focus { outline: 0; }
+
+.p-rail {
+  position: absolute;
+  top: 3vmin;
+  right: 4vmin;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 1.6vmin;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+  display: flex;
+  gap: 0.5em;
+  align-items: baseline;
+}
+.p-rail .p-n { color: var(--ink); font-weight: 600; }
+
+.pstate {
+  width: min(150vmin, 100%);
+  max-height: 88vmin;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2.4vmin;
+  overflow: hidden;
+}
+.pstate.dark { }
+.present:has(.pstate.dark) { background: var(--ink); }
+/* The rail sits outside .pstate, so the dark overrides below never reach it.
+   Without these two the state number is ink on ink and simply vanishes. */
+.present:has(.pstate.dark) .p-rail { color: rgba(245, 243, 238, 0.45); }
+.present:has(.pstate.dark) .p-rail .p-n { color: var(--paper); }
+.pstate.dark, .pstate.dark .p-mid, .pstate.dark .p-huge { color: var(--paper); }
+.pstate.dark .p-eyebrow, .pstate.dark .p-k { color: rgba(245, 243, 238, 0.5); }
+.pstate.dark .p-hex { color: color-mix(in srgb, var(--accent) 32%, var(--paper)); }
+
+.p-eyebrow,
+.p-k {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 1.7vmin;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.p-huge {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 9vmin;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  max-width: 20ch;
+}
+.p-huge .p-cur { font-size: 0.42em; margin-left: 0.25em; color: var(--ink-3); }
+.pstate.dark .p-huge .p-cur { color: rgba(245, 243, 238, 0.55); }
+
+.p-mid {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 3.6vmin;
+  line-height: 1.25;
+  color: var(--ink);
+  max-width: 40ch;
+}
+.p-mid b { font-style: italic; font-weight: 400; color: var(--accent); }
+.pstate.dark .p-mid b { color: color-mix(in srgb, var(--accent) 32%, var(--paper)); }
+
+.p-small { font-size: 1.9vmin; color: var(--ink-2); max-width: 74ch; }
+.pstate.dark .p-small { color: rgba(245, 243, 238, 0.6); }
+
+.p-two { display: grid; grid-template-columns: 1fr 1fr; gap: 5vmin; align-items: start; }
+.p-two .p-mid { font-size: 3vmin; max-width: none; }
+
+/* the compiler states */
+.p-src {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 5vmin;
+  line-height: 1.24;
+  color: var(--ink);
+  max-width: 30ch;
+}
+.p-src u {
+  text-decoration: underline wavy var(--clay);
+  text-underline-offset: 0.22em;
+  text-decoration-thickness: 0.35vmin;
+}
+.p-claim { font-family: var(--font-mono), ui-monospace, monospace; font-size: 1.9vmin; color: var(--ink-2); }
+.p-claim b { color: var(--accent); font-weight: 600; }
+
+.p-diags { display: grid; gap: 1.8vmin; }
+.p-pending { min-height: 8vmin; }
+.p-diag { border-left: 0.45vmin solid var(--clay); padding-left: 1.6vmin; }
+.p-diag .dc {
+  display: block;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 2.1vmin;
+  font-weight: 600;
+  color: var(--clay);
+  letter-spacing: 0.03em;
+}
+.p-diag .da {
+  display: block;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 1.5vmin;
+  color: var(--ink-3);
+  margin-top: 0.2vmin;
+}
+.p-diag .dl { font-size: 2vmin; line-height: 1.35; color: var(--ink-2); margin-top: 0.5vmin; max-width: 92ch; }
+.p-diag .dl b { color: var(--ink); font-weight: 600; }
+
+.p-status {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 3.2vmin;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.p-status.no { color: var(--clay); }
+.p-status.ok { color: var(--accent); }
+
+/* grids of named fields */
+.p-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(30vmin, 1fr)); gap: 0; border-top: 1px solid var(--line); }
+.pstate.dark .p-grid { border-color: rgba(245, 243, 238, 0.18); }
+.p-grid.three { grid-template-columns: repeat(3, 1fr); }
+.p-grid > div { padding: 2vmin 2vmin 2.2vmin 0; border-right: 1px solid var(--line); }
+.pstate.dark .p-grid > div { border-color: rgba(245, 243, 238, 0.14); }
+.p-grid > div:last-child { border-right: 0; }
+.p-grid dt { font-family: var(--font-mono), ui-monospace, monospace; font-size: 1.5vmin; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+.p-grid dd { margin: 0.7vmin 0 0; font-size: 2.6vmin; font-weight: 600; color: var(--ink); }
+.p-grid dd.p-addr { font-family: var(--font-mono), ui-monospace, monospace; font-size: 1.5vmin; font-weight: 500; overflow-wrap: anywhere; }
+.p-grid dd.p-small { font-size: 1.9vmin; font-weight: 400; }
+.p-grid .p-sub { display: block; font-family: var(--font-mono), ui-monospace, monospace; font-size: 1.4vmin; font-weight: 400; color: var(--ink-3); margin-top: 0.4vmin; }
+
+.p-rule { font-size: 2.4vmin; line-height: 1.4; color: var(--ink-2); max-width: 80ch; border-left: 0.45vmin solid var(--accent); padding-left: 1.8vmin; }
+
+/* the identifier that must read the same in state 6 and state 11 */
+.p-wid { border-top: 1px solid var(--line); padding-top: 1.6vmin; display: grid; gap: 0.6vmin; }
+.pstate.dark .p-wid { border-color: rgba(245, 243, 238, 0.18); }
+.p-hex {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 2.4vmin;
+  font-weight: 600;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+  letter-spacing: 0.01em;
+}
+
+/* offers */
+.p-offer { border-top: 0.5vmin solid var(--line); padding-top: 1.8vmin; opacity: 0.25; transition: opacity 300ms ease; }
+.p-offer.on { opacity: 1; }
+.p-offer.sel { border-top-color: var(--ink); }
+.p-offer .p-price { font-family: var(--font-display), Georgia, serif; font-size: 6vmin; margin-top: 0.5vmin; }
+.p-checks { list-style: none; margin: 1.4vmin 0 0; padding: 0; display: grid; gap: 0.8vmin; font-size: 2vmin; }
+.p-checks .ok span { color: var(--accent); font-weight: 700; }
+.p-checks .no span { color: var(--clay); font-weight: 700; }
+.p-res { margin-top: 1.6vmin; font-size: 2vmin; line-height: 1.4; max-width: 46ch; }
+.p-res.ok { color: var(--accent); font-weight: 600; }
+.p-res.no { color: var(--ink-2); border-top: 0.3vmin solid var(--clay); padding-top: 1.2vmin; }
+
+/* the purchase */
+.p-cta {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 3vmin;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 1vmin;
+  padding: 2vmin 2.6vmin;
+  justify-self: start;
+}
+.p-cta.live { background: var(--accent); }
+.p-cap { border-left: 0.45vmin solid var(--line-strong); padding-left: 1.6vmin; }
+.p-trace { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9vmin; }
+.p-trace li { display: grid; grid-template-columns: 3vmin minmax(28vmin, max-content) 1fr; gap: 1.4vmin; align-items: baseline; font-size: 2vmin; }
+.p-trace .s { font-family: var(--font-mono), ui-monospace, monospace; color: var(--ink-3); font-size: 1.5vmin; }
+.p-trace .l { font-weight: 600; color: var(--ink); }
+.p-trace .d { color: var(--ink-3); font-size: 1.8vmin; }
+
+/* the scan */
+.p-count { font-family: var(--font-display), Georgia, serif; font-size: 16vmin; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.p-count .p-of-n { font-size: 0.3em; color: var(--ink-3); }
+
+/* the proof, field by field */
+.p-fields { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7vmin; }
+.p-fields li { display: grid; grid-template-columns: 3vmin minmax(34vmin, max-content) 1fr; gap: 1.4vmin; align-items: baseline; font-size: 2.1vmin; }
+.p-fields .ok > span:first-child { color: var(--accent); font-weight: 700; }
+.p-fields .no > span:first-child { color: var(--clay); font-weight: 700; }
+.p-fields .fn { font-weight: 600; }
+.p-fields .src { font-family: var(--font-mono), ui-monospace, monospace; font-size: 1.5vmin; letter-spacing: 0.06em; }
+.p-fields .src.chain { color: var(--accent); }
+.p-fields .src.fixture { color: var(--clay); }
+
+/* the limit */
+.p-missing { list-style: none; margin: 0; padding: 0; display: grid; gap: 1vmin; font-size: 2vmin; color: var(--ink-2); }
+.p-missing b { font-family: var(--font-mono), ui-monospace, monospace; font-size: 0.86em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay); margin-right: 0.8em; }
+.p-ops { display: flex; gap: 1.2vmin; align-items: center; flex-wrap: wrap; }
+.p-ops .brace { font-family: var(--font-mono), ui-monospace, monospace; font-size: 4vmin; color: var(--ink-3); }
+.p-ops .op { font-family: var(--font-mono), ui-monospace, monospace; font-size: 2.2vmin; border: 1px solid var(--line-strong); border-radius: 0.8vmin; padding: 0.8vmin 1.4vmin; }
+
+/* the closing frame */
+.p-layers { display: grid; gap: 0.6vmin; border-bottom: 1px solid rgba(245, 243, 238, 0.16); padding-bottom: 3vmin; }
+.p-layers > div { display: grid; grid-template-columns: 26vmin 1fr; gap: 3vmin; align-items: baseline; }
+.p-layers .lk { font-family: var(--font-mono), ui-monospace, monospace; font-size: 1.7vmin; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(245, 243, 238, 0.42); }
+.p-layers .lv { font-family: var(--font-display), Georgia, serif; font-size: 5vmin; line-height: 1.1; color: rgba(245, 243, 238, 0.4); }
+.p-layers .now .lk { color: rgba(245, 243, 238, 0.72); }
+.p-layers .now .lv { color: var(--paper); }
+.p-layers .now em { font-style: italic; color: color-mix(in srgb, var(--accent) 32%, var(--paper)); }
+.p-closer { font-family: var(--font-display), Georgia, serif; font-size: 8vmin; line-height: 1.06; color: var(--paper); max-width: 18ch; }
+.p-closer em { font-style: italic; color: color-mix(in srgb, var(--accent) 32%, var(--paper)); }
