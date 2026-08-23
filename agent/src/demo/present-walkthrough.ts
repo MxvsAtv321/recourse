@@ -6,7 +6,7 @@
  * from outside a browser at all: the keyboard drives the same state variable.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const ROOT = new URL("../../../", import.meta.url).pathname;
 let PORT = 3410;
@@ -111,7 +111,7 @@ await serve(async (get, port) => {
 
   const bodies: Record<number, string> = {};
   for (let s = 1; s <= 14; s++) {
-    const sub = s === 4 ? 4 : s === 8 ? 2 : s === 3 || s === 10 ? 1 : 0;
+    const sub = s === 4 ? 4 : s === 8 || s === 10 || s === 11 ? 2 : s === 3 ? 1 : 0;
     bodies[s] = await get(`/present?s=${s}&sub=${sub}`);
   }
   console.log("");
@@ -139,9 +139,11 @@ await serve(async (get, port) => {
   const delay = src.match(/const DELAY: Record<number, number> = \{([^}]*)\}/)?.[1] ?? "";
   console.log(`\n  self advancing states: {${auto.trim()} }`);
   console.log(`  delays ms            : {${delay.trim()} }`);
+  const sched = (n: string) => Number(src.match(new RegExp(`const ${n} = (\\d+)`))?.[1] ?? 0);
+  console.log(`  gate ${sched("GATE_MS")}ms  stagger ${sched("STAGGER_MS")}ms  sweep ${sched("SWEEP_MS")}ms  carry ${sched("CARRY_MS")}ms`);
   check("state 4 has four self-advancing steps", /4:\s*4/.test(auto));
-  check("  spaced roughly 700ms", /4:\s*700/.test(delay));
-  check("  and the scan in state 10 advances itself too", /10:\s*1/.test(auto));
+  check("  the field sweep and the crossing advance themselves too", /10:\s*2/.test(auto) && /11:\s*2/.test(auto));
+  check("  every schedule constant is a real duration", [sched("GATE_MS"), sched("STAGGER_MS"), sched("SWEEP_MS"), sched("CARRY_MS")].every((v) => v > 0));
 
   console.log("");
   const codesAt: string[][] = [];
@@ -246,6 +248,221 @@ await serve(async (get, port) => {
   check("the heaviest state is not an outlier against the others", worst / median < 6, `${(worst / median).toFixed(1)}x the median`);
   check("  and no state is heavy in absolute terms", worst < 1800, `heaviest carries ${worst} characters`);
   note("actual fit at 1920x1080", "not measurable without a browser; the clip guarantees no scrollbar, not that nothing is cut off");
+
+  // ------------------------------------------------------------------------
+  head("6  SLIDE 4: FOUR PATHS, THREE GATES, THE ERROR IN THE GAP");
+
+  const s4 = bodies[4];
+  const lanes = [...s4.matchAll(/data-gate="(\d)" data-artifact="([^"]*)" style="--lane:(\d);--gates:(\d);--stop:(\d+)"/g)].map((m) => ({
+    gate: Number(m[1]),
+    artifact: m[2],
+    lane: Number(m[3]),
+    stop: Number(m[5]),
+  }));
+  console.log("");
+  for (const l of lanes) console.log(`    lane ${l.lane}  gate ${l.gate}  travelled ${100 - l.stop}%  ${l.artifact}`);
+
+  check("four artifacts reach for the claim", lanes.length === 4);
+  check("  none of them arrives", lanes.every((l) => l.gate < 4 && l.stop > 0));
+  const gates = lanes.map((l) => l.gate);
+  check("  they stop at three distinct gates", new Set(gates).size === 3, `gates ${gates.join(", ")}`);
+  check(
+    "  two stop at gate 1, per spec 5.1, and carry different codes",
+    gates.filter((g) => g === 1).length === 2,
+  );
+  const codes4 = [...s4.matchAll(/class="dc">([A-Z_]+)</g)].map((m) => m[1]);
+  console.log(`    codes  ${codes4.join(", ")}`);
+  check("  a typed error at every break point", codes4.length === 4 && new Set(codes4).size === 4);
+  check("  the further a path gets, the less room its error has", lanes.every((l, k) => k === 0 || lanes[k - 1].gate > l.gate || l.stop <= lanes[k - 1].stop));
+  const gateMs = Number(s4.match(/data-gate-ms="(\d+)"/)?.[1] ?? 0);
+  const stagMs = Number(s4.match(/data-stagger-ms="(\d+)"/)?.[1] ?? 0);
+  check(
+    "  the stylesheet animates on the same numbers the clock counts",
+    gateMs === sched("GATE_MS") && stagMs === sched("STAGGER_MS"),
+    `${gateMs}ms per gate, ${stagMs}ms stagger`,
+  );
+
+  // ------------------------------------------------------------------------
+  head("7  SLIDE 10: THE FIELD IS THE DELIVERY");
+
+  const s10 = bodies[10];
+  const attr = (h: string, k: string) => h.match(new RegExp(`data-${k}="([^"]*)"`))?.[1] ?? "";
+  const cells = [...s10.matchAll(/class="c([^"]*)"/g)].map((m) => m[1]);
+  const bad = cells.map((c) => c.includes("bad"));
+  const firstBad = bad.indexOf(true);
+  let longest = 0;
+  let run = 0;
+  for (const b of bad) {
+    run = b ? run + 1 : 0;
+    if (run > longest) longest = run;
+  }
+  console.log("");
+  console.log(`    ${cells.length} cells, ${bad.filter(Boolean).length} violating, first at ${firstBad}, longest run ${longest}`);
+  console.log(`    182..205  ${bad.slice(182, 206).map((b) => (b ? "x" : ".")).join("")}`);
+
+  check("one cell per record", cells.length === Number(attr(s10, "cells")) && cells.length === 500);
+  check("  the head of the file is clean", firstBad === Number(attr(s10, "first")) && bad.slice(0, firstBad).every((b) => !b));
+  check("  and it is 187 records deep", firstBad === 187);
+  check("  the violations after it are interleaved, not a block", longest === 4 && longest < bad.length - firstBad);
+  check("  which is what a spot check of the first page misses", bad.slice(firstBad).filter((b) => !b).length > 0, `${bad.slice(firstBad).filter((b) => !b).length} compliant records break up the tail`);
+  check("  the field counts what the engine counted", attr(s10, "agrees") === "true", `${attr(s10, "violations")} violations, engine said the same`);
+  check("  the sweep stops on the record that broke the promise", (s10.match(/class="c on bad"/g) ?? []).length === 1);
+
+  // ------------------------------------------------------------------------
+  head("8  SLIDE 11: BOTH HASHES ON SCREEN, AT THE SAME TIME");
+
+  const carried: Record<number, string> = {};
+  for (let n = 7; n <= 11; n++) carried[n] = attr(bodies[n], "carry");
+  const spec6 = attr(bodies[6], "witness-6");
+  const after11 = attr(bodies[11], "witness-11");
+  console.log("");
+  console.log(`    slide  6  spec        ${spec6}`);
+  for (let n = 7; n <= 10; n++) console.log(`    slide ${String(n).padStart(2)}  carried     ${carried[n]}`);
+  console.log(`    slide 11  recomputed  ${after11}`);
+
+  check("the spec's hash is carried from slide 6", carried[7] === spec6);
+  check("  and is on screen through 7, 8, 9 and 10", [7, 8, 9, 10].every((n) => carried[n] === spec6));
+  check("  it is still there on 11, beside the recomputation", carried[11] === spec6 && after11.length === 66);
+  check("  the two are character identical", carried[11] === after11);
+  check("  the slot it lands on mirrors it exactly", (bodies[11].match(/p-carryghost/g) ?? []).length === 1 && bodies[11].includes(`<span class="p-hex">${spec6}`));
+  check("  the nine field rows survive, fixture row included", (bodies[11].match(/class="fn"/g) ?? []).length === 9 && bodies[11].includes("fixture both sides"));
+
+  // ------------------------------------------------------------------------
+  head("9  EVERY VALUE STILL COMES FROM THE ENGINE");
+
+  const fixturePath = `${ROOT}agent/src/fixtures/evidence.ts`;
+  const original = readFileSync(fixturePath, "utf8");
+  const engineProbe = () =>
+    spawnSync(
+      `${ROOT}agent/node_modules/.bin/tsx`,
+      [
+        "-e",
+        `import { buildCompile } from "${ROOT}agent/src/compile.ts";
+         import { buildField } from "${ROOT}agent/src/field.ts";
+         const g = buildCompile(null, null).compilations[1].diagnostics.map((d) => d.gate).join(",");
+         const f = buildField({ totalRecords: 500, violations: 251, firstViolationIndex: 187 });
+         const m = buildField({ totalRecords: 500, violations: 251, firstViolationIndex: 240 });
+         console.log(JSON.stringify({ g, first: f.firstViolationIndex, moved: m.firstViolationIndex, agrees: m.agrees }));`,
+      ],
+      { encoding: "utf8", cwd: ROOT },
+    ).stdout.trim().split("\n").pop() ?? "";
+  const before = JSON.parse(engineProbe() || "{}");
+  try {
+    writeFileSync(fixturePath, original.replace('    effectiveSubject: "RESPONSE",', '    effectiveSubject: "RECORD",'));
+    const changed = JSON.parse(engineProbe() || "{}");
+    console.log("");
+    console.log(`    fixture as measured                    gates ${before.g}`);
+    console.log(`    last_updated declared honest instead   gates ${changed.g}`);
+    check("changing one measured fixture changes where a path stops", before.g !== changed.g);
+    check("  the second lane is the one that moves", before.g.split(",")[1] !== changed.g.split(",")[1]);
+  } finally {
+    writeFileSync(fixturePath, original);
+  }
+  const restored = JSON.parse(engineProbe() || "{}");
+  check("  the fixture is restored", restored.g === before.g, `gates ${restored.g}`);
+  console.log("");
+  console.log(`    field onset 187 -> first violation ${before.first};  onset 240 -> ${before.moved}`);
+  check("the field follows the delivery, not a drawing", before.first === 187 && before.moved === 240);
+  check("  and says so when it stops agreeing with the run", before.agrees === false);
+
+  // ------------------------------------------------------------------------
+  head("10  PREFERS-REDUCED-MOTION RENDERS FINAL STATES");
+
+  const rm = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)", css.indexOf(".p-gates")));
+  const block = rm.slice(0, rm.indexOf("\n}\n") + 3);
+  console.log("");
+  for (const line of block.split("\n").filter((l) => l.includes("{"))) console.log(`    ${line.trim().slice(0, 72)}`);
+  check("the paths render at their stop rather than travelling", /\.run \{ animation: none; stroke-dashoffset: var\(--stop\)/.test(block));
+  check("  the halts and the errors are simply there", /\.halt \{ animation: none/.test(block) && /\.p-diag \{ animation: none/.test(block));
+  check("  the whole field is resolved", /\.p-field \.c \{ transition: none; opacity: 1/.test(block));
+  check("  the hashes are already equal", /\.p-meet \.eq \{[^}]*opacity: 1/.test(block));
+  check("  and nothing has receded", /\.p-fields\.recede \{ opacity: 1/.test(block));
+  check("the component honours it too, not only the stylesheet", /prefers-reduced-motion: reduce/.test(src) && /if \(reduced\) \{\s*setSub\(max\)/.test(src));
+
+  // ------------------------------------------------------------------------
+  head("11  SLIDE 8: TWO PRICES, THE SMALLER ONE LOST");
+
+  const s8 = [await get("/present?s=8&sub=0"), await get("/present?s=8&sub=1"), await get("/present?s=8&sub=2")];
+  const offersOf = (h: string) =>
+    [...h.matchAll(/class="p-offer([^"]*)"[^>]*data-price="([^"]*)" data-eligible="([^"]*)"/g)].map((m) => ({
+      cls: m[1].trim(),
+      price: m[2],
+      eligible: m[3] === "true",
+    }));
+  const at0 = offersOf(s8[0]);
+  console.log("");
+  for (let n = 0; n < 3; n++) {
+    const o = offersOf(s8[n]);
+    console.log(`    sub ${n}   ${o.map((x) => `${x.price} [${x.cls}]`).join("   ")}`);
+  }
+
+  const priceSize = Number(css.match(/\.p-offer \.p-price \{[^}]*font-size: ([\d.]+)vmin/)?.[1] ?? 0);
+  const checkSize = Number(css.match(/\.p-checks \{[^}]*font-size: ([\d.]+)vmin/)?.[1] ?? 0);
+  console.log(`\n    price ${priceSize}vmin, against ${checkSize}vmin for the checks beneath it`);
+  check("both prices render at display scale", priceSize >= 8 && at0.length === 2);
+  check("  the price is the largest thing on the offer", priceSize > checkSize * 3);
+  check(
+    "  and both are at full strength at rest, before any check resolves",
+    (s8[0].match(/class="p-price"/g) ?? []).length === 2 && !/\.p-offer \{[^}]*opacity/.test(css),
+  );
+  check("  with nothing resolved yet to read them against", !s8[0].includes("p-checks") && !s8[0].includes("p-res"));
+
+  const resolved = (h: string) => offersOf(h).filter((o) => o.cls.includes("on"));
+  check("the offer that passes resolves first", resolved(s8[1]).length === 1 && resolved(s8[1])[0].eligible);
+  check("  the refusal lands second, one step later", resolved(s8[2]).length === 2 && resolved(s8[2]).some((o) => !o.eligible));
+  const passPrice = Number(resolved(s8[1])[0]?.price.replace("$", "") ?? 0);
+  const failPrice = Number(offersOf(s8[2]).find((o) => !o.eligible)?.price.replace("$", "") ?? 0);
+  check(
+    "  which is the dearer offer passing before the cheaper one fails",
+    passPrice > failPrice && failPrice > 0,
+    `${passPrice.toFixed(3)} passes, then ${failPrice.toFixed(3)} is refused`,
+  );
+
+  check("the number itself carries the outcome", /\.p-offer\.on\.pass \.p-price \{ color: var\(--accent\)/.test(css) && /\.p-offer\.on\.fail \.p-price \{ color: var\(--clay\)/.test(css));
+  check("  in clay, which is what failure already looks like here", /\.p-checks \.no span \{ color: var\(--clay\)/.test(css));
+  check("  and no palette entry was invented for it", !/--[a-z-]*(red|amber|warn|danger)/.test(css));
+
+  const labelH = css.match(/\.p-offer \.p-k \{[^}]*height: ([\d.]+)vmin/)?.[1] ?? "";
+  check(
+    "the two prices start on one line whatever the vendor is called",
+    labelH !== "" && /\.p-offer \.p-k \{[^}]*align-items: flex-end/.test(css),
+    `the name sits in a fixed ${labelH}vmin box, bottom aligned`,
+  );
+  const vendors = [...s8[0].matchAll(/<span class="p-k">([^<]*)<\/span>/g)].map((m) => m[1]).filter((v) => v !== "spec");
+  check(
+    "  which matters, because one name is eight times the length of the other",
+    vendors.length === 2 && Math.max(...vendors.map((v) => v.length)) > 4 * Math.min(...vendors.map((v) => v.length)),
+    vendors.map((v) => `${v} (${v.length})`).join(" vs "),
+  );
+  check(
+    "  and the clay rule is reserved on both, so nothing shifts when it lands",
+    /\.p-offer \.p-price \{ border-bottom: [\d.]+vmin solid transparent/.test(css) && /\.p-offer\.on\.fail \.p-price \{ border-bottom-color: var\(--clay\)/.test(css),
+  );
+
+  check("slide 8 still costs two steps and no more", /8:\s*2/.test(auto) && /8:\s*900/.test(delay));
+
+  // the prices are read, not written down
+  const offersPath = `${ROOT}agent/src/fixtures/offers.ts`;
+  const offersSrc = readFileSync(offersPath, "utf8");
+  try {
+    writeFileSync(offersPath, offersSrc.replace("export const AISA_PRICE_MICROS = 8_000;", "export const AISA_PRICE_MICROS = 11_000;"));
+    const moved = spawnSync(
+      `${ROOT}agent/node_modules/.bin/tsx`,
+      ["-e", `import { buildXRay } from "${ROOT}agent/src/xray.ts"; console.log(buildXRay().decision.offers.map((o) => o.price + ":" + o.eligible).join(" "));`],
+      { encoding: "utf8", cwd: ROOT },
+    ).stdout.trim().split("\n").pop() ?? "";
+    console.log(`\n    fixture as measured     ${at0.map((o) => `${o.price}:${o.eligible}`).join(" ")}`);
+    console.log(`    fixture priced at 0.011 ${moved}`);
+    check("the prices come from the offers fixture", moved.includes("$0.011") && !moved.includes("$0.008"));
+  } finally {
+    writeFileSync(offersPath, offersSrc);
+  }
+  const back = spawnSync(
+    `${ROOT}agent/node_modules/.bin/tsx`,
+    ["-e", `import { buildXRay } from "${ROOT}agent/src/xray.ts"; console.log(buildXRay().decision.offers.map((o) => o.price).join(" "));`],
+    { encoding: "utf8", cwd: ROOT },
+  ).stdout.trim().split("\n").pop() ?? "";
+  check("  and the fixture is restored", back.includes("$0.008"), back);
 
   return null;
 });

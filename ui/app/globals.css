@@ -2083,10 +2083,42 @@ details[open] .chev {
 }
 
 /* offers */
-.p-offer { border-top: 0.5vmin solid var(--line); padding-top: 1.8vmin; opacity: 0.25; transition: opacity 300ms ease; }
-.p-offer.on { opacity: 1; }
+/* Slide 8. The beat is that the lower price is refused, so the price is the
+   slide and the checks are the footnote. The offer as a whole no longer fades:
+   dimming it dimmed the two numbers along with it, which is exactly what stopped
+   the room comparing them at rest. Only the part that resolves arrives. */
+.p-offer { border-top: 0.5vmin solid var(--line); padding-top: 1.8vmin; }
 .p-offer.sel { border-top-color: var(--ink); }
-.p-offer .p-price { font-family: var(--font-display), Georgia, serif; font-size: 6vmin; margin-top: 0.5vmin; }
+/* A vendor name that wraps must not push its price down: the two numbers only
+   compare if they start on the same line. Fixed box, bottom aligned, so one line
+   or two makes no difference to where the price begins. */
+.p-offer .p-k { display: flex; align-items: flex-end; height: 5vmin; margin: 0; }
+.p-offer .p-price {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 9.5vmin;
+  line-height: 1;
+  margin-top: 0.6vmin;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  transition: color 320ms ease;
+}
+/* the number carries the outcome, since the number is what a buyer optimises for */
+.p-offer.on.pass .p-price { color: var(--accent); }
+.p-offer.on.fail .p-price { color: var(--clay); }
+/* Instrument Serif has one weight and it is a thin one, so colour alone in a
+   display numeral reads soft from the back of a room. The rule is the same clay
+   bar .p-res.no already uses, moved onto the number that lost. */
+.p-offer .p-price { border-bottom: 0.3vmin solid transparent; padding-bottom: 0.6vmin; }
+.p-offer.on.fail .p-price { border-bottom-color: var(--clay); }
+
+.p-offer.on .p-checks,
+.p-offer.on .p-res {
+  opacity: 0;
+  animation: p-offer-in 300ms ease-out forwards;
+}
+@keyframes p-offer-in {
+  to { opacity: 1; }
+}
 .p-checks { list-style: none; margin: 1.4vmin 0 0; padding: 0; display: grid; gap: 0.8vmin; font-size: 2vmin; }
 .p-checks .ok span { color: var(--accent); font-weight: 700; }
 .p-checks .no span { color: var(--clay); font-weight: 700; }
@@ -2145,3 +2177,188 @@ details[open] .chev {
 .p-layers .now em { font-style: italic; color: color-mix(in srgb, var(--accent) 32%, var(--paper)); }
 .p-closer { font-family: var(--font-display), Georgia, serif; font-size: 8vmin; line-height: 1.06; color: var(--paper); max-width: 18ch; }
 .p-closer em { font-style: italic; color: color-mix(in srgb, var(--accent) 32%, var(--paper)); }
+
+/* ================================================================ slide 4, the four attempts
+   One path per artifact, running left to right through four gate positions
+   toward the claim, and breaking at the gate that defeated it. The distance is
+   the finding, so nothing here is decorative: the untravelled remainder is
+   drawn as a dotted bed precisely so the gap is legible, and the typed error
+   occupies that gap. Timing comes from --gate-ms and --stagger-ms, which the
+   component sets from the same constants its own clock counts on. */
+
+.p-gates { position: relative; display: grid; gap: 0; margin-top: 1vmin; }
+
+.p-gatehead { position: relative; height: 2.6vmin; }
+.p-gatehead .gh {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 1.25vmin;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.p-gatehead .gh i { font-style: normal; color: var(--ink-2); font-weight: 700; }
+.p-gatehead .gh.claim { left: auto; right: 0; transform: none; color: var(--accent); font-weight: 700; }
+
+.p-lane { position: relative; min-height: 13vmin; }
+.p-lane .who {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 1.35vmin;
+  color: var(--ink-2);
+  letter-spacing: 0.02em;
+}
+.p-lane .track { position: absolute; top: 2.5vmin; left: 0; width: 100%; height: 0.6vmin; overflow: visible; }
+.p-lane .track .bed { stroke: var(--ink-3); stroke-width: 1px; stroke-dasharray: 2 4; opacity: 0.5; }
+.p-lane .track .run {
+  stroke: var(--ink-2);
+  stroke-width: 2.5px;
+  stroke-linecap: butt;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: p-run calc(var(--gate-ms) * var(--gates)) cubic-bezier(0.3, 0.85, 0.35, 1) forwards;
+  animation-delay: calc(var(--stagger-ms) * var(--lane));
+}
+@keyframes p-run {
+  to { stroke-dashoffset: var(--stop); }
+}
+
+/* the stop: where the path got to, and no further */
+.p-lane .halt {
+  position: absolute;
+  top: 1.5vmin;
+  width: 0.45vmin;
+  height: 2.6vmin;
+  margin-left: -0.22vmin;
+  background: var(--clay);
+  border-radius: 0.1vmin;
+  opacity: 0;
+  transform: scaleY(0.3);
+  transform-origin: center;
+  animation: p-halt 220ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  animation-delay: calc(var(--stagger-ms) * var(--lane) + var(--gate-ms) * var(--gates));
+}
+@keyframes p-halt {
+  to { opacity: 1; transform: none; }
+}
+
+/* the error, in the room the path did not cover */
+.p-lane .p-diag {
+  position: absolute;
+  top: 4.4vmin;
+  right: 0;
+  border-left-width: 0.3vmin;
+  padding-left: 1.1vmin;
+  opacity: 0;
+  transform: translateX(-0.7vmin);
+  animation: p-diag-in 260ms ease-out forwards;
+}
+@keyframes p-diag-in {
+  to { opacity: 1; transform: none; }
+}
+.p-lane .p-diag .dc { font-size: 1.5vmin; }
+.p-lane .p-diag .da { font-size: 1.15vmin; margin-top: 0.15vmin; }
+.p-lane .p-diag .dl { font-size: 1.35vmin; line-height: 1.4; margin-top: 0.35vmin; max-width: none; }
+
+/* a right arrow mid sequence completes it, so every animation lands at once */
+.p-gates.done .track .run { animation: none; stroke-dashoffset: var(--stop); }
+.p-gates.done .halt { animation: none; opacity: 1; transform: none; }
+
+/* the source and the compiled claim give the lanes their room */
+.pstate:has(.p-gates) .p-src { font-size: 4.6vmin; }
+.pstate:has(.p-gates) .p-claim { font-size: 1.9vmin; }
+
+/* ================================================================ slide 10, the field
+   Five hundred cells, one per record, swept in index order. Only opacity moves;
+   each cell's colour is fixed from the start by whether that record actually
+   violates the predicate, so the sweep reveals the delivery rather than
+   deciding it. Unswept cells sit low enough that the pattern cannot be read
+   ahead of the scan. */
+
+.p-field {
+  display: grid;
+  grid-template-columns: repeat(50, 1fr);
+  gap: 0.26vmin;
+  width: min(118vmin, 100%);
+  margin-bottom: 1.4vmin;
+}
+.p-field .c {
+  aspect-ratio: 1;
+  border-radius: 0.15vmin;
+  background: var(--accent);
+  opacity: 0.07;
+  transition: opacity 170ms linear;
+}
+.p-field .c.bad { background: var(--clay); }
+.p-field .c.on { opacity: 1; }
+.p-field.tail .c { opacity: 1; }
+
+/* the count is a caption to the field now, not the whole slide */
+.pstate:has(.p-field) .p-count { font-size: 8.4vmin; }
+
+/* ================================================================ slide 11, the hashes meet
+   The spec's hash is carried on screen from slide 6 so that the equality can be
+   seen rather than remembered. The chip stays in fixed position throughout and
+   is translated onto its slot, so it never reflows anything it crosses. */
+
+.p-carry,
+.p-carryghost {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.9em;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 1.5vmin;
+  white-space: nowrap;
+}
+.p-carry {
+  position: fixed;
+  left: 4vmin;
+  bottom: 3.2vmin;
+  z-index: 3;
+  opacity: 0.42;
+  transition: transform 700ms cubic-bezier(0.2, 0.75, 0.25, 1), opacity 260ms ease;
+  will-change: transform;
+}
+.p-carry .p-k { font-size: 1.1vmin; }
+.p-carry .p-hex { font-size: 1.5vmin; font-weight: 500; color: var(--ink-2); }
+.p-carry.meeting { opacity: 1; }
+.p-carry.met .p-hex { color: var(--accent); font-weight: 600; }
+.p-carryghost { visibility: hidden; }
+
+.p-meet { display: grid; gap: 0.4vmin; border-top: 1px solid var(--line); padding-top: 1.4vmin; margin-top: 1.4vmin; }
+.p-meet .row { display: grid; gap: 0.25vmin; }
+.p-meet .row .p-k { font-size: 1.1vmin; }
+.p-meet .row .p-hex { font-size: 1.5vmin; font-weight: 500; color: var(--ink-2); }
+.p-meet .eq {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 1.8vmin;
+  color: var(--ink-3);
+  opacity: 0;
+  transition: opacity 220ms ease, color 220ms ease;
+}
+.p-meet.met .eq { opacity: 1; color: var(--accent); }
+.p-meet.met .row .p-hex { color: var(--accent); font-weight: 600; }
+
+/* everything else steps back while they meet, then comes forward again */
+.p-fields { transition: opacity 300ms ease; }
+.p-fields.recede { opacity: 0.16; }
+
+/* ================================================================ asked not to be moved at */
+@media (prefers-reduced-motion: reduce) {
+  .p-lane .track .run { animation: none; stroke-dashoffset: var(--stop); }
+  .p-lane .halt { animation: none; opacity: 1; transform: none; }
+  .p-lane .p-diag { animation: none; opacity: 1; transform: none; }
+  .p-field .c { transition: none; opacity: 1; }
+  .p-carry { transition: none; }
+  .p-meet .eq { transition: none; opacity: 1; color: var(--accent); }
+  .p-fields { transition: none; }
+  .p-fields.recede { opacity: 1; }
+  .p-offer .p-price { transition: none; }
+  .p-offer.on .p-checks,
+  .p-offer.on .p-res { animation: none; opacity: 1; }
+}

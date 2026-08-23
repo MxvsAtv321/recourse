@@ -2,6 +2,7 @@ import { Present } from "../components/Present";
 import { loadRun } from "../../lib/run";
 import { buildXRay } from "../../../agent/src/xray";
 import { buildCompile } from "../../../agent/src/compile";
+import { buildField } from "../../../agent/src/field";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,7 @@ export default async function PresentPage({
       decision={xray.decision}
       refusal={xray.refusal}
       scan={run.protectedPurchase.scan}
+      field={buildField(run.protectedPurchase.scan)}
       settlement={run.protectedPurchase.settlement}
       amount={run.protectedPurchase.amount}
       decimals={run.meta.assetDecimals}

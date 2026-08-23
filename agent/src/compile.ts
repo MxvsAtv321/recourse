@@ -38,6 +38,15 @@ export type Diagnostic = {
   /** One line. What was found, against what was required. */
   found: string;
   required: string;
+  /**
+   * The gate the artifact stopped at, 1 to 4, straight off `Lane.gate`. The
+   * presentation draws one path per artifact and breaks it here, so this is the
+   * distance travelled and not a label. 0 for a diagnostic with no lane behind
+   * it, which is every diagnostic from the seller phrase.
+   */
+  gate: number;
+  /** The artifact that stopped, so a path can be named without a lookup. */
+  artifact: string;
 };
 
 export type WitnessView = {
@@ -121,30 +130,32 @@ function diagnosticFor(requirement: string, lane: Lane): Diagnostic | null {
   if (lane.passed) return null;
   const r = lane.reason;
   const at = locate(requirement, lane.gate);
+  const w = { gate: lane.gate, artifact: lane.artifact.id };
   switch (r.code) {
     case "SUBJECT_MISMATCH":
-      return { code: r.code, at, found: `${lane.artifact.id} is about the ${r.found.toLowerCase()}`, required: `a fact about each ${r.needs.toLowerCase()}` };
+      return { ...w, code: r.code, at, found: `${lane.artifact.id} is about the ${r.found.toLowerCase()}`, required: `a fact about each ${r.needs.toLowerCase()}` };
     case "SUBJECT_COLLAPSE":
       return {
+        ...w,
         code: r.code,
         at,
         found: `${lane.artifact.id} is per ${r.effective.toLowerCase()} in fact (${r.evidence})`,
         required: `per ${r.declared.toLowerCase()}`,
       };
     case "PROPERTY_REFUTED":
-      return { code: r.code, at, found: `${lane.artifact.id} asserted ${r.asserted}, and ${r.actual}`, required: "a measurement, not a verdict" };
+      return { ...w, code: r.code, at, found: `${lane.artifact.id} asserted ${r.asserted}, and ${r.actual}`, required: "a measurement, not a verdict" };
     case "PROPERTY_NOT_COMPARABLE":
-      return { code: r.code, at, found: `${lane.artifact.id} carries a ${r.found.toLowerCase()}`, required: "a quantity a threshold can compare" };
+      return { ...w, code: r.code, at, found: `${lane.artifact.id} carries a ${r.found.toLowerCase()}`, required: "a quantity a threshold can compare" };
     case "PROPERTY_MISMATCH":
-      return { code: r.code, at, found: `${lane.artifact.id} carries ${r.found.toLowerCase().replace(/_/g, " ")}`, required: r.needs.toLowerCase().replace(/_/g, " ") };
+      return { ...w, code: r.code, at, found: `${lane.artifact.id} carries ${r.found.toLowerCase().replace(/_/g, " ")}`, required: r.needs.toLowerCase().replace(/_/g, " ") };
     case "ISSUER_UNSIGNED":
-      return { code: r.code, at, found: `${lane.artifact.id} is unsigned`, required: `a signature from ${PERMITTED_ISSUER}` };
+      return { ...w, code: r.code, at, found: `${lane.artifact.id} is unsigned`, required: `a signature from ${PERMITTED_ISSUER}` };
     case "ISSUER_NOT_PERMITTED":
-      return { code: r.code, at, found: `signed by ${r.found}`, required: `signed by ${r.permitted}` };
+      return { ...w, code: r.code, at, found: `signed by ${r.found}`, required: `signed by ${r.permitted}` };
     case "ISSUER_IS_OBLIGOR":
-      return { code: r.code, at, found: `signed by ${r.obligor}, the obligor`, required: "signed by a party that is not the obligor" };
+      return { ...w, code: r.code, at, found: `signed by ${r.obligor}, the obligor`, required: "signed by a party that is not the obligor" };
     case "NO_ARTIFACT_OFFERED":
-      return { code: r.code, at, found: "no artifact was offered", required: "one artifact bound to the record" };
+      return { ...w, code: r.code, at, found: "no artifact was offered", required: "one artifact bound to the record" };
   }
 }
 
@@ -155,6 +166,8 @@ function compileSellerPhrase(text: string): Compilation {
   const diagnostics: Diagnostic[] =
     m.status === "REFUSED"
       ? m.missing.map((miss) => ({
+          gate: 0,
+          artifact: "seller promise",
           code: `NO_EXECUTABLE_PROPOSITION / missing ${miss.dimension}`,
           at: miss.span
             ? { kind: "SPAN" as const, label: "seller promise", span: [miss.span[0], miss.span[1]] as [number, number], quote: text.slice(miss.span[0], miss.span[1]) }
